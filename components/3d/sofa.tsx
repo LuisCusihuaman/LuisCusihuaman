@@ -4,10 +4,15 @@ import { useRef, useState, useEffect } from "react"
 import { RoundedBox, Html } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
+import { ROOM_DEPTH, ROOM_WIDTH } from "./room"
 
 interface SofaProps {
   onBurritoMode?: (active: boolean) => void
 }
+
+const SOFA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.52, 0, 0.15)
+const SOFA_INTERACTION_POINT = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.72, 0.5, 0.15)
+const BURRITO_CAMERA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.78, 0.65, 0.15)
 
 export function Sofa({ onBurritoMode }: SofaProps) {
   const [isBurritoMode, setIsBurritoMode] = useState(false)
@@ -21,8 +26,7 @@ export function Sofa({ onBurritoMode }: SofaProps) {
   // Check if player is near the sofa (adjusted for smaller room)
   useFrame(() => {
     if (!sofaRef.current) return
-    const sofaPos = new THREE.Vector3(-1.8, 0.5, 0.3)
-    const dist = camera.position.distanceTo(sofaPos)
+    const dist = camera.position.distanceTo(SOFA_INTERACTION_POINT)
     const near = dist < 1.8
     setIsNearSofa(near)
     setShowPrompt(near && !isBurritoMode)
@@ -40,7 +44,7 @@ export function Sofa({ onBurritoMode }: SofaProps) {
           onBurritoMode?.(true)
           
           // Move camera to inside the blanket
-          camera.position.set(-3.2, 0.65, 0.5)
+          camera.position.copy(BURRITO_CAMERA_POSITION)
           camera.rotation.set(0, Math.PI / 2, 0)
         } else {
           // Exit burrito mode
@@ -57,7 +61,7 @@ export function Sofa({ onBurritoMode }: SofaProps) {
   }, [isNearSofa, isBurritoMode, camera, onBurritoMode])
   
   return (
-    <group ref={sofaRef} position={[-3.2, 0, 0.5]} rotation={[0, Math.PI / 2, 0]}>
+    <group ref={sofaRef} position={SOFA_POSITION} rotation={[0, Math.PI / 2, 0]}>
       {/* Main sofa body - worn cream leather */}
       <SofaBase />
       
@@ -421,7 +425,7 @@ function WearMarks() {
 
 export function WallArt() {
   return (
-    <group position={[-4.45, 1.8, 0.5]}>
+    <group position={[-ROOM_WIDTH / 2 + 0.05, 1.8, 0.6]}>
       {/* Small framed artwork on wall */}
       <mesh rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[0.25, 0.35]} />

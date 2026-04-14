@@ -83,7 +83,7 @@ export function PortfolioScene() {
       {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
       
       <Canvas
-        shadows
+        shadows="percentage"
         camera={{ fov: 70, near: 0.1, far: 100 }}
         gl={{ 
           antialias: true,

@@ -10,6 +10,17 @@ interface DeskSetupProps {
   onObjectClick: (object: string) => void
 }
 
+export const DESK_POSITION: [number, number, number] = [-1.1, 0, -1.6]
+
+const DESK_WORLD_POSITION = new THREE.Vector3(...DESK_POSITION)
+const TV_INTERACTION_DISTANCE = 2.25
+const TV_LOCAL_POSITION = new THREE.Vector3(0, 1.7, -0.34)
+const TV_WORLD_POSITION = new THREE.Vector3(
+  DESK_POSITION[0] + TV_LOCAL_POSITION.x,
+  TV_LOCAL_POSITION.y,
+  DESK_POSITION[2] + TV_LOCAL_POSITION.z,
+)
+
 export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
   const [deskHeight, setDeskHeight] = useState(0.75) // Default sitting height
   const [isAdjusting, setIsAdjusting] = useState(false)
@@ -27,8 +38,7 @@ export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
   // Check proximity for desk adjustment
   useFrame(() => {
     if (!groupRef.current) return
-    const deskPos = new THREE.Vector3(0, 0, -1.6)
-    const dist = camera.position.distanceTo(deskPos)
+    const dist = camera.position.distanceTo(DESK_WORLD_POSITION)
     setIsAdjusting(dist < 2)
   })
   
@@ -47,7 +57,7 @@ export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
   }, [isAdjusting])
   
   return (
-    <group ref={groupRef} position={[0, 0, -1.6]}>
+    <group ref={groupRef} position={DESK_POSITION}>
       {/* Main Desk - Standing desk with adjustable height */}
       <StandingDesk height={deskHeight} isAdjusting={isAdjusting} />
       
@@ -323,7 +333,11 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
   // Check proximity for showing prompt
   useFrame(() => {
     if (!groupRef.current) return
-    const pianoWorldPos = new THREE.Vector3(0, deskHeight - 0.12, -1.6 + slidePosition.current)
+    const pianoWorldPos = new THREE.Vector3(
+      DESK_POSITION[0],
+      deskHeight - 0.12,
+      DESK_POSITION[2] + slidePosition.current,
+    )
     const dist = camera.position.distanceTo(pianoWorldPos)
     setShowPrompt(dist < 2)
   })
@@ -519,22 +533,41 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
 
 function TV({ onHover, onClick }: Omit<InteractiveProps, 'deskHeight'>) {
   const [hovered, setHovered] = useState(false)
+  const isNearRef = useRef(false)
   const screenRef = useRef<THREE.MeshStandardMaterial>(null)
+  const { camera } = useThree()
   
   useFrame((state) => {
     if (screenRef.current) {
       const hue = (state.clock.elapsedTime * 0.02) % 1
       screenRef.current.emissive.setHSL(0.05 + hue * 0.1, 0.6, 0.15)
     }
+
+    const near = camera.position.distanceTo(TV_WORLD_POSITION) < TV_INTERACTION_DISTANCE
+
+    if (!near && isNearRef.current) {
+      setHovered(false)
+      onHover(null)
+    }
+
+    isNearRef.current = near
   })
   
   // TV is now bigger (1.6 x 0.9) and lower (1.7 instead of 2.0)
   return (
     <group
-      position={[0, 1.7, -0.45]}
-      onPointerEnter={() => { setHovered(true); onHover("tv") }}
+      position={TV_LOCAL_POSITION}
+      onPointerEnter={() => {
+        if (!isNearRef.current) return
+        setHovered(true)
+        onHover("tv")
+      }}
       onPointerLeave={() => { setHovered(false); onHover(null) }}
-      onClick={() => onClick("tv")}
+      onClick={(event) => {
+        event.stopPropagation()
+        if (!isNearRef.current) return
+        onClick("tv")
+      }}
     >
       {/* TV Frame - Bigger */}
       <RoundedBox args={[1.6, 0.9, 0.05]} radius={0.015} smoothness={4} castShadow>
@@ -1061,7 +1094,7 @@ function Dock({ deskHeight = 0.75 }: { deskHeight: number }) {
 
 function OfficeChair() {
   const [isDragging, setIsDragging] = useState(false)
-  const [position, setPosition] = useState<[number, number, number]>([0, 0, 0.8])
+  const [position, setPosition] = useState<[number, number, number]>([0.15, 0, 0.55])
   const [hovered, setHovered] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
   const { camera, raycaster, mouse, gl } = useThree()

@@ -3,6 +3,8 @@
 import { useRef, useEffect, useCallback } from "react"
 import { useThree, useFrame } from "@react-three/fiber"
 import * as THREE from "three"
+import { ROOM_BACK_EXTENT, ROOM_FRONT_EXTENT, ROOM_WIDTH } from "./room"
+import { DESK_POSITION } from "./desk-setup"
 
 interface FirstPersonControlsProps {
   speed?: number
@@ -16,11 +18,18 @@ interface FirstPersonControlsProps {
   }
 }
 
+const DEFAULT_ROOM_BOUNDS = {
+  minX: -ROOM_WIDTH / 2 + 0.25,
+  maxX: ROOM_WIDTH / 2 - 0.25,
+  minZ: -ROOM_BACK_EXTENT + 0.25,
+  maxZ: ROOM_FRONT_EXTENT - 0.25,
+}
+
 export function FirstPersonControls({
   speed = 4,
   jumpForce = 5,
   playerHeight = 1.7,
-  roomBounds = { minX: -4.5, maxX: 4.5, minZ: -3.5, maxZ: 3.5 },
+  roomBounds = DEFAULT_ROOM_BOUNDS,
 }: FirstPersonControlsProps) {
   const { camera, gl } = useThree()
   
@@ -57,6 +66,14 @@ export function FirstPersonControls({
 
   const onPointerlockChange = useCallback(() => {
     isLocked.current = document.pointerLockElement === gl.domElement
+
+    if (!isLocked.current) {
+      moveState.current.forward = false
+      moveState.current.backward = false
+      moveState.current.left = false
+      moveState.current.right = false
+      velocity.current.set(0, 0, 0)
+    }
   }, [gl])
 
   const onKeyDown = useCallback((event: KeyboardEvent) => {
@@ -123,9 +140,10 @@ export function FirstPersonControls({
     document.addEventListener("keyup", onKeyUp)
     gl.domElement.addEventListener("click", onClick)
 
-    // Set initial camera position and rotation
-    camera.position.set(0, playerHeight, 3)
-    euler.current.y = Math.PI // Face the desk
+    // Spawn inside the room and sync the internal euler with the real camera.
+    camera.position.set(0, playerHeight, ROOM_FRONT_EXTENT - 0.8)
+    camera.lookAt(DESK_POSITION[0], playerHeight, DESK_POSITION[2])
+    euler.current.setFromQuaternion(camera.quaternion, "YXZ")
 
     return () => {
       document.removeEventListener("mousemove", onMouseMove)
