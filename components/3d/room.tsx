@@ -8,7 +8,7 @@ import { Html } from "@react-three/drei"
 // Room dimensions - smaller for 44m2 apartment
 const ROOM_WIDTH = 5
 const ROOM_BACK_EXTENT = 2
-const ROOM_FRONT_EXTENT = 3
+const ROOM_FRONT_EXTENT = 4.2
 const ROOM_DEPTH = ROOM_BACK_EXTENT + ROOM_FRONT_EXTENT
 const ROOM_HEIGHT = 2.8
 const ROOM_CENTER_Z = (ROOM_FRONT_EXTENT - ROOM_BACK_EXTENT) / 2

@@ -8,6 +8,7 @@ import * as THREE from "three"
 import { Room, Lighting } from "./room"
 import { DeskSetup } from "./desk-setup"
 import { Sofa, WallArt } from "./sofa"
+import { DiningArea } from "./dining-area"
 import { FirstPersonControls } from "./first-person-controls"
 import { PortfolioPanel, HoverIndicator, ControlsHint, Crosshair } from "./portfolio-panels"
 import { LoadingScreen } from "./loading-screen"
@@ -28,6 +29,7 @@ function Scene({
       <Room />
       <DeskSetup onObjectHover={onHover} onObjectClick={onClick} />
       <Sofa onBurritoMode={onBurritoMode} />
+      <DiningArea />
       <WallArt />
       <FirstPersonControls />
     </>

@@ -1094,7 +1094,7 @@ function Dock({ deskHeight = 0.75 }: { deskHeight: number }) {
 
 function OfficeChair() {
   const [isDragging, setIsDragging] = useState(false)
-  const [position, setPosition] = useState<[number, number, number]>([0.15, 0, 0.55])
+  const [position, setPosition] = useState<[number, number, number]>([-0.95, 0, 0.45])
   const [hovered, setHovered] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
   const { camera, raycaster, mouse, gl } = useThree()
@@ -1138,6 +1138,7 @@ function OfficeChair() {
     <group 
       ref={groupRef}
       position={position}
+      rotation={[0, Math.PI, 0]}
       onPointerDown={handlePointerDown}
       onPointerEnter={() => { setHovered(true); gl.domElement.style.cursor = 'grab' }}
       onPointerLeave={() => { if (!isDragging) { setHovered(false); gl.domElement.style.cursor = 'auto' } }}
