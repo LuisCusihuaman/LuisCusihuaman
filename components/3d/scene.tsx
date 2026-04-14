@@ -17,11 +17,13 @@ import { AmbientAudio } from "./ambient-audio"
 function Scene({ 
   onHover, 
   onClick,
-  onBurritoMode
+  onBurritoMode,
+  isBurritoMode,
 }: { 
   onHover: (obj: string | null) => void
   onClick: (obj: string) => void
   onBurritoMode: (active: boolean) => void
+  isBurritoMode: boolean
 }) {
   return (
     <>
@@ -31,7 +33,7 @@ function Scene({
       <Sofa onBurritoMode={onBurritoMode} />
       <DiningArea />
       <WallArt />
-      <FirstPersonControls />
+      <FirstPersonControls allowMovement={!isBurritoMode} />
     </>
   )
 }
@@ -102,6 +104,7 @@ export function PortfolioScene() {
             onHover={setHoveredObject} 
             onClick={handleObjectClick}
             onBurritoMode={setIsBurritoMode}
+            isBurritoMode={isBurritoMode}
           />
           <PointerLockTracker setIsLocked={setIsLocked} />
           <Preload all />

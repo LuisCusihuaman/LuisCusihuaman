@@ -12,7 +12,8 @@ interface SofaProps {
 
 const SOFA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.52, 0, 0.95)
 const SOFA_INTERACTION_POINT = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.72, 0.5, 0.95)
-const BURRITO_CAMERA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.78, 0.65, 0.95)
+const BURRITO_CAMERA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.74, 0.58, 0.98)
+const BURRITO_CAMERA_ROTATION = new THREE.Euler(-0.42, Math.PI / 2, -0.18, "YXZ")
 
 export function Sofa({ onBurritoMode }: SofaProps) {
   const [isBurritoMode, setIsBurritoMode] = useState(false)
@@ -21,7 +22,7 @@ export function Sofa({ onBurritoMode }: SofaProps) {
   const { camera } = useThree()
   const sofaRef = useRef<THREE.Group>(null)
   const originalCameraPos = useRef<THREE.Vector3>(new THREE.Vector3())
-  const originalCameraRot = useRef<THREE.Euler>(new THREE.Euler())
+  const originalCameraQuaternion = useRef<THREE.Quaternion>(new THREE.Quaternion())
   
   // Check if player is near the sofa (adjusted for smaller room)
   useFrame(() => {
@@ -35,24 +36,27 @@ export function Sofa({ onBurritoMode }: SofaProps) {
   // Handle E key for burrito mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "KeyE" && isNearSofa) {
-        if (!isBurritoMode) {
-          // Enter burrito mode
-          originalCameraPos.current.copy(camera.position)
-          originalCameraRot.current.copy(camera.rotation)
-          setIsBurritoMode(true)
-          onBurritoMode?.(true)
-          
-          // Move camera to inside the blanket
-          camera.position.copy(BURRITO_CAMERA_POSITION)
-          camera.rotation.set(0, Math.PI / 2, 0)
-        } else {
-          // Exit burrito mode
-          setIsBurritoMode(false)
-          onBurritoMode?.(false)
-          camera.position.copy(originalCameraPos.current)
-          camera.rotation.copy(originalCameraRot.current)
-        }
+      if (e.code !== "KeyE") return
+
+      if (isBurritoMode) {
+        // Exit burrito mode from anywhere, even after looking around.
+        setIsBurritoMode(false)
+        onBurritoMode?.(false)
+        camera.position.copy(originalCameraPos.current)
+        camera.quaternion.copy(originalCameraQuaternion.current)
+        return
+      }
+
+      if (isNearSofa) {
+        // Enter burrito mode
+        originalCameraPos.current.copy(camera.position)
+        originalCameraQuaternion.current.copy(camera.quaternion)
+        setIsBurritoMode(true)
+        onBurritoMode?.(true)
+        
+        // Move camera into a reclined POV so it feels like lying on the sofa.
+        camera.position.copy(BURRITO_CAMERA_POSITION)
+        camera.quaternion.setFromEuler(BURRITO_CAMERA_ROTATION)
       }
     }
     

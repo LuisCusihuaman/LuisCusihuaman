@@ -20,6 +20,314 @@ const TV_WORLD_POSITION = new THREE.Vector3(
   TV_LOCAL_POSITION.y,
   DESK_POSITION[2] + TV_LOCAL_POSITION.z,
 )
+const TABLET_INTERACTION_DISTANCE = 1.9
+
+function createMacDesktopTexture() {
+  const canvas = document.createElement("canvas")
+  canvas.width = 1600
+  canvas.height = 900
+
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return null
+
+  const background = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+  background.addColorStop(0, "#08111d")
+  background.addColorStop(0.4, "#173a61")
+  background.addColorStop(0.75, "#ff824d")
+  background.addColorStop(1, "#ffd17f")
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  const glow = ctx.createRadialGradient(canvas.width * 0.72, canvas.height * 0.3, 40, canvas.width * 0.72, canvas.height * 0.3, 520)
+  glow.addColorStop(0, "rgba(255,255,255,0.55)")
+  glow.addColorStop(0.3, "rgba(255,196,120,0.28)")
+  glow.addColorStop(1, "rgba(255,196,120,0)")
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  ctx.fillStyle = "rgba(7,10,18,0.22)"
+  ctx.beginPath()
+  ctx.moveTo(0, canvas.height * 0.78)
+  ctx.quadraticCurveTo(canvas.width * 0.22, canvas.height * 0.62, canvas.width * 0.42, canvas.height * 0.74)
+  ctx.quadraticCurveTo(canvas.width * 0.7, canvas.height * 0.9, canvas.width, canvas.height * 0.68)
+  ctx.lineTo(canvas.width, canvas.height)
+  ctx.lineTo(0, canvas.height)
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.fillStyle = "rgba(255,255,255,0.12)"
+  ctx.fillRect(0, 0, canvas.width, 36)
+  ctx.fillStyle = "#f5f7fb"
+  ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Finder    File    Edit    View    Go    Window    Help", 26, 24)
+  ctx.fillText("Tue 4:20 PM", canvas.width - 154, 24)
+
+  drawWindow(ctx, 180, 132, 420, 272, "#eef3fb", "Portfolio")
+  drawWindow(ctx, 680, 170, 520, 326, "#f4f7fc", "Now Playing")
+
+  ctx.fillStyle = "#253247"
+  ctx.font = "24px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Creative workspace", 214, 214)
+  ctx.fillStyle = "#56657d"
+  ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Next.js  •  React Three Fiber  •  TypeScript", 214, 252)
+
+  ctx.fillStyle = "#1f4a7c"
+  roundRect(ctx, 214, 288, 138, 42, 12)
+  ctx.fill()
+  ctx.fillStyle = "#ffffff"
+  ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Open Panel", 246, 315)
+
+  const panelGradient = ctx.createLinearGradient(712, 220, 1160, 452)
+  panelGradient.addColorStop(0, "#1f2f4a")
+  panelGradient.addColorStop(1, "#243b60")
+  ctx.fillStyle = panelGradient
+  roundRect(ctx, 712, 220, 456, 222, 18)
+  ctx.fill()
+
+  ctx.fillStyle = "#dbe7ff"
+  ctx.font = "22px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Lo-fi coding session", 744, 268)
+  ctx.fillStyle = "#adc0e3"
+  ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Desk lights on, city lights outside.", 744, 304)
+  ctx.fillText("Monitor wakes up when you get closer.", 744, 334)
+
+  ctx.fillStyle = "rgba(255,255,255,0.16)"
+  roundRect(ctx, 744, 374, 344, 12, 6)
+  ctx.fill()
+  ctx.fillStyle = "#f7a05c"
+  roundRect(ctx, 744, 374, 232, 12, 6)
+  ctx.fill()
+
+  ctx.fillStyle = "rgba(22,25,35,0.34)"
+  roundRect(ctx, canvas.width / 2 - 292, canvas.height - 88, 584, 62, 24)
+  ctx.fill()
+
+  const dockColors = ["#6aa9ff", "#f77f67", "#72d39b", "#f4c15d", "#ab8cff", "#95d7ff", "#ffffff"]
+  dockColors.forEach((color, index) => {
+    ctx.fillStyle = color
+    roundRect(ctx, canvas.width / 2 - 240 + index * 72, canvas.height - 72, 48, 48, 14)
+    ctx.fill()
+  })
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+
+  return texture
+}
+
+function createTabletWorkspaceTexture() {
+  const canvas = document.createElement("canvas")
+  canvas.width = 1200
+  canvas.height = 800
+
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return null
+
+  ctx.fillStyle = "#1d2027"
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  ctx.fillStyle = "#2a2f39"
+  ctx.fillRect(0, 0, 74, canvas.height)
+  ctx.fillStyle = "#232833"
+  ctx.fillRect(74, 0, canvas.width - 74, 44)
+  ctx.fillStyle = "#252a35"
+  ctx.fillRect(canvas.width - 188, 44, 188, canvas.height - 44)
+
+  ;["#ff5f57", "#febc2e", "#28c840"].forEach((dot, i) => {
+    ctx.fillStyle = dot
+    ctx.beginPath()
+    ctx.arc(24 + i * 18, 22, 6, 0, Math.PI * 2)
+    ctx.fill()
+  })
+
+  ctx.fillStyle = "#dfe6f2"
+  ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Photoshop", 96, 28)
+  ctx.fillText("dog-sketch.psd @ 66.7%", 238, 28)
+
+  ctx.fillStyle = "#3a404d"
+  ;[[20, 82], [20, 132], [20, 182], [20, 232], [20, 282], [20, 332]].forEach(([x, y], i) => {
+    roundRect(ctx, x, y, 34, 34, 8)
+    ctx.fill()
+    ctx.fillStyle = i % 2 === 0 ? "#d7dce8" : "#9ad0ff"
+    ctx.fillRect(x + 10, y + 10, 14, 14)
+    ctx.fillStyle = "#3a404d"
+  })
+
+  const artX = 116
+  const artY = 84
+  const artW = 760
+  const artH = 594
+
+  ctx.fillStyle = "#10131a"
+  roundRect(ctx, artX - 12, artY - 12, artW + 24, artH + 24, 20)
+  ctx.fill()
+
+  const artGradient = ctx.createLinearGradient(artX, artY, artX + artW, artY + artH)
+  artGradient.addColorStop(0, "#f9eee5")
+  artGradient.addColorStop(1, "#f3dbc5")
+  ctx.fillStyle = artGradient
+  roundRect(ctx, artX, artY, artW, artH, 18)
+  ctx.fill()
+
+  ctx.fillStyle = "rgba(255,255,255,0.38)"
+  ctx.beginPath()
+  ctx.ellipse(artX + 510, artY + 168, 190, 110, -0.4, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.fillStyle = "#f8e7d3"
+  ctx.beginPath()
+  ctx.ellipse(artX + 364, artY + 376, 170, 138, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.fillStyle = "#d89c64"
+  ctx.beginPath()
+  ctx.ellipse(artX + 366, artY + 328, 116, 106, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.moveTo(artX + 284, artY + 224)
+  ctx.lineTo(artX + 232, artY + 146)
+  ctx.lineTo(artX + 322, artY + 178)
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.moveTo(artX + 446, artY + 216)
+  ctx.lineTo(artX + 512, artY + 154)
+  ctx.lineTo(artX + 406, artY + 174)
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.fillStyle = "#fff8f0"
+  ctx.beginPath()
+  ctx.ellipse(artX + 330, artY + 348, 18, 24, 0, 0, Math.PI * 2)
+  ctx.ellipse(artX + 404, artY + 348, 18, 24, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.fillStyle = "#2c221d"
+  ctx.beginPath()
+  ctx.ellipse(artX + 332, artY + 350, 8, 12, 0, 0, Math.PI * 2)
+  ctx.ellipse(artX + 402, artY + 350, 8, 12, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.strokeStyle = "#2c221d"
+  ctx.lineWidth = 6
+  ctx.beginPath()
+  ctx.moveTo(artX + 348, artY + 410)
+  ctx.quadraticCurveTo(artX + 366, artY + 425, artX + 384, artY + 410)
+  ctx.stroke()
+
+  ctx.fillStyle = "#2c221d"
+  ctx.beginPath()
+  ctx.moveTo(artX + 366, artY + 374)
+  ctx.lineTo(artX + 348, artY + 396)
+  ctx.lineTo(artX + 384, artY + 396)
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.strokeStyle = "rgba(44,34,29,0.7)"
+  ctx.lineWidth = 3
+  ;[-1, 1].forEach((side) => {
+    ctx.beginPath()
+    ctx.moveTo(artX + 364 + side * 34, artY + 392)
+    ctx.lineTo(artX + 364 + side * 74, artY + 382)
+    ctx.moveTo(artX + 364 + side * 34, artY + 404)
+    ctx.lineTo(artX + 364 + side * 82, artY + 404)
+    ctx.moveTo(artX + 364 + side * 34, artY + 416)
+    ctx.lineTo(artX + 364 + side * 72, artY + 428)
+    ctx.stroke()
+  })
+
+  ctx.fillStyle = "#4a5161"
+  ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Golden retriever study", artX + 24, artY + artH - 28)
+
+  ctx.fillStyle = "#2b303b"
+  roundRect(ctx, canvas.width - 168, 68, 142, 180, 12)
+  ctx.fill()
+  ctx.fillStyle = "#d6dde8"
+  ctx.font = "16px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText("Layers", canvas.width - 132, 92)
+
+  ;[
+    ["Lineart", "#f4f7fb"],
+    ["Color", "#ffcf92"],
+    ["Background", "#d4e3ff"],
+  ].forEach(([label, color], i) => {
+    ctx.fillStyle = "#3b4250"
+    roundRect(ctx, canvas.width - 156, 112 + i * 42, 118, 30, 8)
+    ctx.fill()
+    ctx.fillStyle = color
+    ctx.fillRect(canvas.width - 146, 120 + i * 42, 18, 14)
+    ctx.fillStyle = "#dfe5f0"
+    ctx.fillText(label, canvas.width - 118, 133 + i * 42)
+  })
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+
+  return texture
+}
+
+function drawWindow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+  title: string,
+) {
+  ctx.fillStyle = "rgba(255,255,255,0.3)"
+  roundRect(ctx, x, y, width, height, 20)
+  ctx.fill()
+
+  ctx.fillStyle = color
+  roundRect(ctx, x, y + 12, width, height - 12, 18)
+  ctx.fill()
+
+  ctx.fillStyle = "rgba(230,235,244,0.95)"
+  roundRect(ctx, x, y, width, 34, 18)
+  ctx.fill()
+
+  ;["#ff5f57", "#febc2e", "#28c840"].forEach((dot, i) => {
+    ctx.fillStyle = dot
+    ctx.beginPath()
+    ctx.arc(x + 24 + i * 18, y + 18, 6, 0, Math.PI * 2)
+    ctx.fill()
+  })
+
+  ctx.fillStyle = "#415066"
+  ctx.font = "16px -apple-system, BlinkMacSystemFont, sans-serif"
+  ctx.fillText(title, x + 90, y + 23)
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.lineTo(x + width - radius, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
+  ctx.lineTo(x + width, y + height - radius)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+  ctx.lineTo(x + radius, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
+  ctx.lineTo(x, y + radius)
+  ctx.quadraticCurveTo(x, y, x + radius, y)
+  ctx.closePath()
+}
 
 export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
   const [deskHeight, setDeskHeight] = useState(0.75) // Default sitting height
@@ -534,16 +842,29 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
 function TV({ onHover, onClick }: Omit<InteractiveProps, 'deskHeight'>) {
   const [hovered, setHovered] = useState(false)
   const isNearRef = useRef(false)
+  const screenPower = useRef(0)
   const screenRef = useRef<THREE.MeshStandardMaterial>(null)
   const { camera } = useThree()
-  
-  useFrame((state) => {
-    if (screenRef.current) {
-      const hue = (state.clock.elapsedTime * 0.02) % 1
-      screenRef.current.emissive.setHSL(0.05 + hue * 0.1, 0.6, 0.15)
-    }
+  const desktopTexture = useMemo(() => createMacDesktopTexture(), [])
 
+  useEffect(() => {
+    return () => {
+      desktopTexture?.dispose()
+    }
+  }, [desktopTexture])
+  
+  useFrame(() => {
     const near = camera.position.distanceTo(TV_WORLD_POSITION) < TV_INTERACTION_DISTANCE
+    screenPower.current += ((near ? 1 : 0) - screenPower.current) * 0.12
+
+    if (screenRef.current) {
+      const glow = 0.18 + screenPower.current * (hovered ? 0.92 : 0.75)
+      const base = 0.03 + screenPower.current * 0.97
+
+      screenRef.current.color.setScalar(base)
+      screenRef.current.emissive.setScalar(screenPower.current > 0.02 ? 1 : 0)
+      screenRef.current.emissiveIntensity = glow * screenPower.current
+    }
 
     if (!near && isNearRef.current) {
       setHovered(false)
@@ -583,10 +904,14 @@ function TV({ onHover, onClick }: Omit<InteractiveProps, 'deskHeight'>) {
         <planeGeometry args={[1.5, 0.82]} />
         <meshStandardMaterial 
           ref={screenRef}
-          color="#1a1a1a"
-          emissive="#cc6633"
-          emissiveIntensity={hovered ? 0.5 : 0.3}
-          roughness={0.1}
+          color="#050607"
+          map={desktopTexture ?? undefined}
+          emissiveMap={desktopTexture ?? undefined}
+          emissive="#ffffff"
+          emissiveIntensity={0}
+          roughness={0.08}
+          metalness={0.02}
+          toneMapped={false}
         />
       </mesh>
       
@@ -613,22 +938,56 @@ function TV({ onHover, onClick }: Omit<InteractiveProps, 'deskHeight'>) {
 
 function DrawingTablet({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
   const [hovered, setHovered] = useState(false)
+  const isNearRef = useRef(false)
+  const screenPower = useRef(0)
   const screenRef = useRef<THREE.MeshStandardMaterial>(null)
-  
-  useFrame((state) => {
-    if (screenRef.current) {
-      screenRef.current.emissiveIntensity = hovered ? 0.4 : 0.2 + Math.sin(state.clock.elapsedTime * 2) * 0.05
+  const { camera } = useThree()
+  const tabletTexture = useMemo(() => createTabletWorkspaceTexture(), [])
+
+  useEffect(() => {
+    return () => {
+      tabletTexture?.dispose()
     }
+  }, [tabletTexture])
+  
+  useFrame(() => {
+    const tabletWorldPos = new THREE.Vector3(DESK_POSITION[0] - 0.48, deskHeight + 0.16, DESK_POSITION[2] + 0.06)
+    const near = camera.position.distanceTo(tabletWorldPos) < TABLET_INTERACTION_DISTANCE
+    screenPower.current += ((near ? 1 : 0) - screenPower.current) * 0.12
+
+    if (screenRef.current) {
+      const glow = 0.14 + screenPower.current * (hovered ? 0.78 : 0.62)
+      const base = 0.03 + screenPower.current * 0.97
+
+      screenRef.current.color.setScalar(base)
+      screenRef.current.emissive.setScalar(screenPower.current > 0.02 ? 1 : 0)
+      screenRef.current.emissiveIntensity = glow * screenPower.current
+    }
+
+    if (!near && isNearRef.current) {
+      setHovered(false)
+      onHover(null)
+    }
+
+    isNearRef.current = near
   })
   
   // Better modeled drawing tablet
   return (
     <group
-      position={[-0.5, deskHeight + 0.1, 0]}
-      rotation={[-0.35, 0, 0]}
-      onPointerEnter={() => { setHovered(true); onHover("tablet") }}
+      position={[-0.48, deskHeight + 0.16, 0.06]}
+      rotation={[-0.52, 0.04, 0]}
+      onPointerEnter={() => {
+        if (!isNearRef.current) return
+        setHovered(true)
+        onHover("tablet")
+      }}
       onPointerLeave={() => { setHovered(false); onHover(null) }}
-      onClick={() => onClick("tablet")}
+      onClick={(event) => {
+        event.stopPropagation()
+        if (!isNearRef.current) return
+        onClick("tablet")
+      }}
     >
       {/* Main tablet body - with bezels */}
       <RoundedBox args={[0.6, 0.38, 0.025]} radius={0.015} smoothness={4} castShadow>
@@ -644,10 +1003,14 @@ function DrawingTablet({ deskHeight = 0.75, onHover, onClick }: InteractiveProps
         <planeGeometry args={[0.52, 0.32]} />
         <meshStandardMaterial 
           ref={screenRef}
-          color="#1a1a1a"
-          emissive="#4488cc"
-          emissiveIntensity={0.2}
+          color="#050607"
+          map={tabletTexture ?? undefined}
+          emissiveMap={tabletTexture ?? undefined}
+          emissive="#ffffff"
+          emissiveIntensity={0}
           roughness={0.05}
+          metalness={0.02}
+          toneMapped={false}
         />
       </mesh>
       

@@ -7,6 +7,7 @@ import { ROOM_BACK_EXTENT, ROOM_FRONT_EXTENT, ROOM_WIDTH } from "./room"
 import { DESK_POSITION } from "./desk-setup"
 
 interface FirstPersonControlsProps {
+  allowMovement?: boolean
   speed?: number
   jumpForce?: number
   playerHeight?: number
@@ -26,6 +27,7 @@ const DEFAULT_ROOM_BOUNDS = {
 }
 
 export function FirstPersonControls({
+  allowMovement = true,
   speed = 4,
   jumpForce = 5,
   playerHeight = 1.7,
@@ -46,10 +48,21 @@ export function FirstPersonControls({
   const isLocked = useRef(false)
   const verticalVelocity = useRef(0)
   const isGrounded = useRef(true)
+  const allowMovementRef = useRef(allowMovement)
+  const didInitializeSpawn = useRef(false)
   
   const PI_2 = Math.PI / 2
   const minPolarAngle = -PI_2 * 0.85
   const maxPolarAngle = PI_2 * 0.85
+
+  const resetMovementState = useCallback(() => {
+    moveState.current.forward = false
+    moveState.current.backward = false
+    moveState.current.left = false
+    moveState.current.right = false
+    velocity.current.set(0, 0, 0)
+    verticalVelocity.current = 0
+  }, [])
 
   const onMouseMove = useCallback((event: MouseEvent) => {
     if (!isLocked.current) return
@@ -68,15 +81,13 @@ export function FirstPersonControls({
     isLocked.current = document.pointerLockElement === gl.domElement
 
     if (!isLocked.current) {
-      moveState.current.forward = false
-      moveState.current.backward = false
-      moveState.current.left = false
-      moveState.current.right = false
-      velocity.current.set(0, 0, 0)
+      resetMovementState()
     }
-  }, [gl])
+  }, [gl, resetMovementState])
 
   const onKeyDown = useCallback((event: KeyboardEvent) => {
+    if (!allowMovementRef.current) return
+
     switch (event.code) {
       case "KeyW":
       case "ArrowUp":
@@ -104,6 +115,8 @@ export function FirstPersonControls({
   }, [jumpForce])
 
   const onKeyUp = useCallback((event: KeyboardEvent) => {
+    if (!allowMovementRef.current) return
+
     switch (event.code) {
       case "KeyW":
       case "ArrowUp":
@@ -134,16 +147,21 @@ export function FirstPersonControls({
   }, [gl])
 
   useEffect(() => {
+    if (didInitializeSpawn.current) return
+
+    // Spawn inside the room once and sync the internal euler with the real camera.
+    camera.position.set(0, playerHeight, ROOM_FRONT_EXTENT - 0.8)
+    camera.lookAt(DESK_POSITION[0], playerHeight, DESK_POSITION[2])
+    euler.current.setFromQuaternion(camera.quaternion, "YXZ")
+    didInitializeSpawn.current = true
+  }, [camera, playerHeight])
+
+  useEffect(() => {
     document.addEventListener("mousemove", onMouseMove)
     document.addEventListener("pointerlockchange", onPointerlockChange)
     document.addEventListener("keydown", onKeyDown)
     document.addEventListener("keyup", onKeyUp)
     gl.domElement.addEventListener("click", onClick)
-
-    // Spawn inside the room and sync the internal euler with the real camera.
-    camera.position.set(0, playerHeight, ROOM_FRONT_EXTENT - 0.8)
-    camera.lookAt(DESK_POSITION[0], playerHeight, DESK_POSITION[2])
-    euler.current.setFromQuaternion(camera.quaternion, "YXZ")
 
     return () => {
       document.removeEventListener("mousemove", onMouseMove)
@@ -152,10 +170,27 @@ export function FirstPersonControls({
       document.removeEventListener("keyup", onKeyUp)
       gl.domElement.removeEventListener("click", onClick)
     }
-  }, [camera, gl, onMouseMove, onPointerlockChange, onKeyDown, onKeyUp, onClick, playerHeight])
+  }, [gl, onMouseMove, onPointerlockChange, onKeyDown, onKeyUp, onClick])
+
+  useEffect(() => {
+    allowMovementRef.current = allowMovement
+
+    if (allowMovement) {
+      euler.current.setFromQuaternion(camera.quaternion, "YXZ")
+      return
+    }
+
+    resetMovementState()
+    euler.current.setFromQuaternion(camera.quaternion, "YXZ")
+  }, [allowMovement, camera, resetMovementState])
 
   useFrame((_, delta) => {
     if (!isLocked.current) return
+    if (!allowMovementRef.current) {
+      velocity.current.set(0, 0, 0)
+      verticalVelocity.current = 0
+      return
+    }
 
     // Calculate movement direction
     const direction = new THREE.Vector3()
