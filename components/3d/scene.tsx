@@ -129,16 +129,12 @@ export function PortfolioScene() {
       
       {/* Navigation hint */}
       {isLocked && !activePanel && !isImmersiveMode && (
-        <div className="fixed bottom-4 right-4 z-20">
-          <div className="px-3 py-1.5 bg-neutral-900/80 backdrop-blur-sm rounded-lg border border-neutral-800">
-            <p className="text-xs text-neutral-400">
-              <span className="text-white">WASD</span> Move
-              <span className="mx-2">|</span>
-              <span className="text-white">E</span> / <span className="text-white">Click</span> Interact
-              <span className="mx-2">|</span>
-              <span className="text-white">ESC</span> Exit
-            </p>
-          </div>
+        <div className="fixed bottom-6 right-6 z-20 pointer-events-none mix-blend-difference">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-white/70 font-medium font-sans">
+            WASD <span className="text-white/30 mx-2">•</span> 
+            E / CLICK <span className="text-white/30 mx-2">•</span> 
+            ESC TO EXIT
+          </p>
         </div>
       )}
       
