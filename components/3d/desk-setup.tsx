@@ -382,7 +382,11 @@ export function DeskSetup({ onObjectHover, onObjectClick, onWorkingMode }: DeskS
     const chairInteractionPoint = new THREE.Vector3(
       DESK_POSITION[0] + chairPosition[0],
       0.82,
-      DESK_POSITION[2] + chairPosition[2] - 0.08,
+      DESK_POSITION[2] + chairPosition[2] - 0.02,
+    )
+    const chairHorizontalDist = Math.hypot(
+      camera.position.x - chairInteractionPoint.x,
+      camera.position.z - chairInteractionPoint.z,
     )
     const tabletWorldPos = new THREE.Vector3(
       DESK_POSITION[0] + TABLET_LOCAL_POSITION.x,
@@ -392,7 +396,7 @@ export function DeskSetup({ onObjectHover, onObjectClick, onWorkingMode }: DeskS
 
     const nextTarget =
       [
-        { id: "chair" as const, dist: camera.position.distanceTo(chairInteractionPoint), threshold: CHAIR_INTERACTION_DISTANCE },
+        { id: "chair" as const, dist: chairHorizontalDist, threshold: CHAIR_INTERACTION_DISTANCE },
         {
           id: "piano" as const,
           dist: camera.position.distanceTo(PIANO_INTERACTION_POINT),
@@ -1782,8 +1786,12 @@ function OfficeChair({
   
   useFrame(() => {
     if (groupRef.current) {
-      const interactionPoint = groupRef.current.localToWorld(new THREE.Vector3(0, 0.82, -0.08))
-      const near = camera.position.distanceTo(interactionPoint) < CHAIR_INTERACTION_DISTANCE
+      const interactionPoint = groupRef.current.localToWorld(new THREE.Vector3(0, 0.82, -0.02))
+      const near =
+        Math.hypot(
+          camera.position.x - interactionPoint.x,
+          camera.position.z - interactionPoint.z,
+        ) < CHAIR_INTERACTION_DISTANCE
       const nextIsNearChair = near && interactionActive
 
       if (nextIsNearChair !== isNearChairRef.current) {

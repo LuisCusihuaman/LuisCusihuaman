@@ -1,10 +1,10 @@
 "use client"
 
 import { useRef, useState, useEffect } from "react"
-import { RoundedBox, Html } from "@react-three/drei"
+import { RoundedBox, Html, useTexture } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
-import { ROOM_DEPTH, ROOM_WIDTH } from "./room"
+import { ROOM_FRONT_EXTENT, ROOM_WIDTH } from "./room"
 
 interface SofaProps {
   onBurritoMode?: (active: boolean) => void
@@ -446,33 +446,93 @@ function WearMarks() {
 }
 
 export function WallArt() {
+  const [cabifyTexture, fiubaTexture, geopagosTexture, insiteTexture] = useTexture([
+    "/work-logos/logo-cabify.webp",
+    "/work-logos/logo-fiuba.webp",
+    "/work-logos/logo-geopagos.webp",
+    "/work-logos/logo-insitela.webp",
+  ])
+
+  ;[cabifyTexture, fiubaTexture, geopagosTexture, insiteTexture].forEach((texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace
+  })
+
   return (
-    <group position={[-ROOM_WIDTH / 2 + 0.05, 1.8, 0.6]}>
-      {/* Small framed artwork on wall */}
-      <mesh rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.25, 0.35]} />
-        <meshStandardMaterial
-          color="#f0f0e8"
-          roughness={0.8}
-        />
+    <>
+      <WorkLogoFrame
+        texture={cabifyTexture}
+        position={[-ROOM_WIDTH / 2 + 0.05, 1.78, 0.9]}
+        rotation={[0, Math.PI / 2, 0]}
+        artSize={[0.6, 0.6]}
+        roleLabel="Site Reliability Engineer - 2024"
+      />
+
+      <WorkLogoFrame
+        texture={fiubaTexture}
+        position={[-ROOM_WIDTH / 2 + 0.05, 1.78, 1.8]}
+        rotation={[0, Math.PI / 2, 0]}
+        artSize={[0.6, 0.6]}
+        roleLabel="Teacher (Software Engineering II) - 2024"
+      />
+
+      <WorkLogoFrame
+        texture={insiteTexture}
+        position={[0.74, 1.86, ROOM_FRONT_EXTENT - 0.035]}
+        rotation={[0, Math.PI, 0]}
+        artSize={[0.55, 0.55]}
+        roleLabel="Sysadmin - 2019"
+      />
+
+      <WorkLogoFrame
+        texture={geopagosTexture}
+        position={[-0.78, 1.86, ROOM_FRONT_EXTENT - 0.035]}
+        rotation={[0, Math.PI, 0]}
+        artSize={[0.55, 0.55]}
+        roleLabel="DevOps Engineer - 2021"
+      />
+    </>
+  )
+}
+
+function WorkLogoFrame({
+  texture,
+  position,
+  rotation,
+  artSize,
+  roleLabel,
+}: {
+  texture: THREE.Texture
+  position: [number, number, number]
+  rotation: [number, number, number]
+  artSize: [number, number]
+  roleLabel: string
+}) {
+  const [width, height] = artSize
+
+  return (
+    <group position={position} rotation={rotation}>
+      <RoundedBox args={[width + 0.04, height + 0.04, 0.045]} radius={0.012} smoothness={4} castShadow>
+        <meshStandardMaterial color="#d8ccb8" roughness={0.92} />
+      </RoundedBox>
+
+      <mesh position={[0, 0, 0.024]} castShadow>
+        <planeGeometry args={[width, height]} />
+        <meshBasicMaterial map={texture} transparent toneMapped={false} />
       </mesh>
-      
-      {/* Simple sketch/drawing impression */}
-      <mesh position={[0.001, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.2, 0.3]} />
-        <meshStandardMaterial
-          color="#e8e4dc"
-          roughness={0.9}
-        />
-      </mesh>
-      
-      {/* Line art suggestion */}
-      {[0.05, 0, -0.05].map((y, i) => (
-        <mesh key={i} position={[0.002, y, 0]} rotation={[0, Math.PI / 2, 0]}>
-          <planeGeometry args={[0.12, 0.003]} />
-          <meshStandardMaterial color="#3a3a3a" roughness={0.9} />
-        </mesh>
-      ))}
+
+      <Html position={[0, -height / 2 - 0.1, 0.03]} center transform scale={0.08}>
+        <div 
+          className="px-3 py-1.5 text-white text-[11px] uppercase tracking-widest font-extrabold whitespace-nowrap"
+          style={{
+            backgroundColor: "#a8744f",
+            border: "2px solid #6b4226",
+            borderRadius: "6px",
+            boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1), inset 0 2px 4px rgba(255,255,255,0.15)"
+          }}
+        >
+          {roleLabel}
+        </div>
+      </Html>
     </group>
   )
 }

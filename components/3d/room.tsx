@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
-import { useFrame } from "@react-three/fiber"
+import { useFrame, useThree } from "@react-three/fiber"
 import { Html } from "@react-three/drei"
 
 // Room dimensions - smaller for 44m2 apartment
@@ -12,6 +12,7 @@ const ROOM_FRONT_EXTENT = 4.2
 const ROOM_DEPTH = ROOM_BACK_EXTENT + ROOM_FRONT_EXTENT
 const ROOM_HEIGHT = 3.05
 const ROOM_CENTER_Z = (ROOM_FRONT_EXTENT - ROOM_BACK_EXTENT) / 2
+type FanLightMode = "normal" | "streamer" | "passion"
 
 // Export for use in other components
 export { ROOM_WIDTH, ROOM_DEPTH, ROOM_HEIGHT, ROOM_BACK_EXTENT, ROOM_FRONT_EXTENT }
@@ -68,10 +69,10 @@ export function Room() {
       <Baseboard />
       
       {/* Door to bathroom - on the right wall, next to the desk area */}
-      <Door position={[ROOM_WIDTH / 2 - 0.02, 0, -1.0]} rotation={[0, -Math.PI / 2, 0]} label="Baño" />
+      <Door position={[ROOM_WIDTH / 2 - 0.02, 0, -1.0]} rotation={[0, -Math.PI / 2, 0]} label="🚿" />
       
       {/* Door to bedroom - on the right wall, about two door widths away from the bathroom */}
-      <Door position={[ROOM_WIDTH / 2 - 0.02, 0, 0.95]} rotation={[0, -Math.PI / 2, 0]} label="Habitación" />
+      <Door position={[ROOM_WIDTH / 2 - 0.02, 0, 0.95]} rotation={[0, -Math.PI / 2, 0]} label="🛏️" />
     </group>
   )
 }
@@ -79,11 +80,86 @@ export function Room() {
 function CeilingFan() {
   const bladesRef = useRef<THREE.Group>(null)
   const fanPosition: [number, number, number] = [0.15, ROOM_HEIGHT - 0.02, ROOM_CENTER_Z + 0.35]
+  const { camera } = useThree()
+  const [lightMode, setLightMode] = useState<FanLightMode>("normal")
+  const [showPrompt, setShowPrompt] = useState(false)
+  const isInteractableRef = useRef(false)
+  const cameraForward = useRef(new THREE.Vector3())
+  const toFan = useRef(new THREE.Vector3())
+
+  const lightModes = {
+    normal: {
+      bulbColor: "#fff6e5",
+      emissive: "#ffd29a",
+      emissiveIntensity: 0.45,
+      pointColor: "#fff1d6",
+      pointIntensity: 0.42,
+      pointDistance: 6.8,
+      ambientColor: "#fff1dd",
+      ambientIntensity: 0.04,
+      label: "Normal",
+    },
+    streamer: {
+      bulbColor: "#d8cbff",
+      emissive: "#8f84ff",
+      emissiveIntensity: 0.56,
+      pointColor: "#8b92ff",
+      pointIntensity: 0.58,
+      pointDistance: 7.2,
+      ambientColor: "#7d84ff",
+      ambientIntensity: 0.1,
+      accentColor: "#ffb07a",
+      label: "Streamer",
+    },
+    passion: {
+      bulbColor: "#ffc6c6",
+      emissive: "#ff6a6a",
+      emissiveIntensity: 0.5,
+      pointColor: "#ff6e6e",
+      pointIntensity: 0.56,
+      pointDistance: 7,
+      ambientColor: "#ff7272",
+      ambientIntensity: 0.1,
+      label: "Passion",
+    },
+  } as const
+
+  const activeLightMode = lightModes[lightMode]
 
   useFrame((state) => {
     if (!bladesRef.current) return
     bladesRef.current.rotation.y = state.clock.elapsedTime * 2.6
+
+    const fanInteractionPoint = new THREE.Vector3(fanPosition[0], fanPosition[1] - 0.2, fanPosition[2])
+    const horizontalDistance = Math.hypot(
+      camera.position.x - fanInteractionPoint.x,
+      camera.position.z - fanInteractionPoint.z,
+    )
+    const looking =
+      horizontalDistance < 2.8 &&
+      camera
+        .getWorldDirection(cameraForward.current)
+        .dot(toFan.current.copy(fanInteractionPoint).sub(camera.position).normalize()) > 0.88
+
+    isInteractableRef.current = looking
+    setShowPrompt((current) => (current === looking ? current : looking))
   })
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("fan-light-mode-change", { detail: lightMode }))
+  }, [lightMode])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "KeyE" || event.repeat || !isInteractableRef.current) return
+      setLightMode((current) =>
+        current === "normal" ? "streamer" : current === "streamer" ? "passion" : "normal",
+      )
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
 
   return (
     <group position={fanPosition}>
@@ -143,9 +219,9 @@ function CeilingFan() {
             <mesh castShadow>
               <sphereGeometry args={[0.08, 18, 18]} />
               <meshStandardMaterial
-                color="#fff6e5"
-                emissive="#ffd29a"
-                emissiveIntensity={0.45}
+                color={index === 0 && lightMode === "streamer" ? "#ffd1a6" : activeLightMode.bulbColor}
+                emissive={index === 0 && lightMode === "streamer" ? activeLightMode.accentColor ?? activeLightMode.emissive : activeLightMode.emissive}
+                emissiveIntensity={lightMode === "streamer" && index === 0 ? 0.65 : activeLightMode.emissiveIntensity}
                 roughness={0.25}
                 transparent
                 opacity={0.92}
@@ -158,8 +234,27 @@ function CeilingFan() {
           </group>
         ))}
 
-        <pointLight position={[0, -0.02, 0]} intensity={0.28} distance={4.8} color="#fff1d6" />
+        <pointLight
+          position={[0, -0.02, 0]}
+          intensity={activeLightMode.pointIntensity}
+          distance={activeLightMode.pointDistance}
+          color={activeLightMode.pointColor}
+        />
+        <pointLight
+          position={[0, 0.1, 0]}
+          intensity={activeLightMode.ambientIntensity}
+          distance={11}
+          color={activeLightMode.ambientColor}
+        />
       </group>
+
+      {showPrompt && (
+        <Html position={[0, -1.0, 0]} center>
+          <div className="bg-black/75 text-white px-3 py-1.5 rounded text-xs whitespace-nowrap backdrop-blur-sm border border-white/15">
+            Press [E] to change fan light: {activeLightMode.label}
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -226,12 +321,12 @@ function Door({ position, rotation, label }: { position: [number, number, number
         <group position={[0, doorHeight * 0.88, frameDepth / 2 + 0.01]}>
           {/* Sign background */}
           <mesh>
-            <planeGeometry args={[0.22, 0.07]} />
-            <meshStandardMaterial color="#3d3d3d" roughness={0.3} metalness={0.4} />
+            <planeGeometry args={[0.18, 0.12]} />
+            <meshStandardMaterial color="#f8f6ef" roughness={0.85} />
           </mesh>
           {/* Label text */}
-          <Html position={[0, 0, 0.01]} center transform scale={0.05}>
-            <div className="text-white text-lg font-semibold tracking-wide whitespace-nowrap">
+          <Html position={[0, 0, 0.01]} center transform scale={0.08}>
+            <div className="text-3xl leading-none whitespace-nowrap">
               {label}
             </div>
           </Html>
@@ -331,6 +426,49 @@ function Baseboard() {
 
 export function Lighting() {
   const ringLightRef = useRef<THREE.PointLight>(null)
+  const sunLightRef = useRef<THREE.DirectionalLight>(null)
+  const sunTargetRef = useRef<THREE.Object3D>(null)
+  const [fanLightMode, setFanLightMode] = useState<FanLightMode>("normal")
+
+  const roomLightModes = {
+    normal: {
+      ambientIntensity: 0.55,
+      ambientColor: "#fff8f2",
+      directionalIntensity: 0.6,
+      directionalColor: "#fff8f0",
+    },
+    streamer: {
+      ambientIntensity: 0.12,
+      ambientColor: "#717cff",
+      directionalIntensity: 0.11,
+      directionalColor: "#c7b4ff",
+    },
+    passion: {
+      ambientIntensity: 0.12,
+      ambientColor: "#ff7a7a",
+      directionalIntensity: 0.1,
+      directionalColor: "#ffb0b0",
+    },
+  } as const
+
+  const activeRoomLightMode = roomLightModes[fanLightMode]
+
+  useEffect(() => {
+    if (!sunLightRef.current || !sunTargetRef.current) return
+    sunLightRef.current.target = sunTargetRef.current
+    sunTargetRef.current.updateMatrixWorld()
+  }, [])
+
+  useEffect(() => {
+    const handleModeChange = (event: Event) => {
+      const customEvent = event as CustomEvent<FanLightMode>
+      if (!customEvent.detail) return
+      setFanLightMode(customEvent.detail)
+    }
+
+    window.addEventListener("fan-light-mode-change", handleModeChange as EventListener)
+    return () => window.removeEventListener("fan-light-mode-change", handleModeChange as EventListener)
+  }, [])
   
   useFrame((state) => {
     if (ringLightRef.current) {
@@ -342,13 +480,14 @@ export function Lighting() {
   return (
     <>
       {/* Main ambient light - brighter for better visibility */}
-      <ambientLight intensity={0.55} color="#fff8f2" />
+      <ambientLight intensity={activeRoomLightMode.ambientIntensity} color={activeRoomLightMode.ambientColor} />
       
       {/* Natural window light simulation (from left) */}
       <directionalLight
-        position={[-5, 4, 2]}
-        intensity={0.6}
-        color="#fff8f0"
+        ref={sunLightRef}
+        position={[-5.2, 4.4, 0.4]}
+        intensity={activeRoomLightMode.directionalIntensity}
+        color={activeRoomLightMode.directionalColor}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-camera-far={20}
@@ -357,6 +496,7 @@ export function Lighting() {
         shadow-camera-top={10}
         shadow-camera-bottom={-10}
       />
+      <object3D ref={sunTargetRef} position={[ROOM_WIDTH / 2, 1.35, 0.95]} />
       
       {/* Monitor glow */}
       <pointLight
