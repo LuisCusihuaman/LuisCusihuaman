@@ -508,29 +508,63 @@ function WorkLogoFrame({
   roleLabel: string
 }) {
   const [width, height] = artSize
+  const [lightMode, setLightMode] = useState("normal")
+
+  useEffect(() => {
+    const handleLightChange = (e: CustomEvent<string>) => {
+      setLightMode(e.detail)
+    }
+
+    // Initialize with current mode conceptually if possible, or assume normal
+    window.addEventListener("fan-light-mode-change", handleLightChange as EventListener)
+    return () => window.removeEventListener("fan-light-mode-change", handleLightChange as EventListener)
+  }, [])
 
   return (
     <group position={position} rotation={rotation}>
       <RoundedBox args={[width + 0.04, height + 0.04, 0.045]} radius={0.012} smoothness={4} castShadow>
-        <meshStandardMaterial color="#d8ccb8" roughness={0.92} />
+        <meshStandardMaterial color="#a8744f" roughness={0.92} />
       </RoundedBox>
 
       <mesh position={[0, 0, 0.024]} castShadow>
         <planeGeometry args={[width, height]} />
-        <meshBasicMaterial map={texture} transparent toneMapped={false} />
+        {lightMode === "normal" ? (
+          <meshBasicMaterial map={texture} transparent toneMapped={false} />
+        ) : (
+          <meshStandardMaterial 
+            map={texture} 
+            transparent 
+            roughness={1} 
+            metalness={0} 
+            toneMapped={false}
+          />
+        )}
       </mesh>
 
       <Html position={[0, -height / 2 - 0.1, 0.03]} center transform scale={0.08}>
-        <div 
-          className="px-3 py-1.5 text-white text-[11px] uppercase tracking-widest font-extrabold whitespace-nowrap"
-          style={{
-            backgroundColor: "#a8744f",
-            border: "2px solid #6b4226",
-            borderRadius: "6px",
-            boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1), inset 0 2px 4px rgba(255,255,255,0.15)"
-          }}
-        >
-          {roleLabel}
+        <div style={{ position: "relative", borderRadius: "6px", overflow: "hidden" }}>
+          <div 
+            className="px-3 py-1.5 text-white text-[11px] uppercase tracking-widest font-extrabold whitespace-nowrap"
+            style={{
+              backgroundColor: "#a8744f",
+              border: "2px solid #6b4226",
+              borderRadius: "6px",
+              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1), inset 0 2px 4px rgba(255,255,255,0.15)"
+            }}
+          >
+            {roleLabel}
+          </div>
+          {lightMode !== "normal" && (
+            <div 
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundColor: lightMode === "streamer" ? "#8b92ff" : "#ff6e6e",
+                mixBlendMode: "multiply",
+                pointerEvents: "none"
+              }}
+            />
+          )}
         </div>
       </Html>
     </group>
