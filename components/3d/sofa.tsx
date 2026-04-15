@@ -446,11 +446,12 @@ function WearMarks() {
 }
 
 export function WallArt() {
+  const basePath = process.env.NODE_ENV === "production" ? "/LuisCusihuaman" : ""
   const [cabifyTexture, fiubaTexture, geopagosTexture, insiteTexture] = useTexture([
-    "/work-logos/logo-cabify.webp",
-    "/work-logos/logo-fiuba.webp",
-    "/work-logos/logo-geopagos.webp",
-    "/work-logos/logo-insitela.webp",
+    `${basePath}/work-logos/logo-cabify.webp`,
+    `${basePath}/work-logos/logo-fiuba.webp`,
+    `${basePath}/work-logos/logo-geopagos.webp`,
+    `${basePath}/work-logos/logo-insitela.webp`,
   ])
 
   ;[cabifyTexture, fiubaTexture, geopagosTexture, insiteTexture].forEach((texture) => {
