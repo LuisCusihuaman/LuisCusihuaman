@@ -55,10 +55,10 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
               className="mb-8"
             >
               <h1 className="text-3xl font-light text-white tracking-widest">
-                CREATIVE STUDIO
+                Hello, I'm Edu.
               </h1>
-              <p className="text-neutral-500 text-sm mt-2 tracking-wide">
-                Portfolio Experience
+              <p className="text-neutral-400 text-sm mt-3 tracking-widest uppercase">
+                Welcome to my portfolio
               </p>
             </motion.div>
 
@@ -104,8 +104,8 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
               transition={{ delay: 0.5 }}
               className="mt-12 text-neutral-600 text-xs max-w-xs mx-auto"
             >
-              <p>Explore my creative workspace in 3D</p>
-              <p className="mt-1">Interact with objects to discover my work</p>
+              <p>Move around with WASD</p>
+              <p className="mt-1">Click on things to see what I do</p>
             </motion.div>
           </div>
 
