@@ -5,6 +5,8 @@ import { Canvas, useThree, useFrame } from "@react-three/fiber"
 import { Preload } from "@react-three/drei"
 import * as THREE from "three"
 
+import { Github } from "lucide-react"
+
 import { Room, Lighting } from "./room"
 import { DeskSetup } from "./desk-setup"
 import { Sofa, WallArt } from "./sofa"
@@ -147,6 +149,19 @@ export function PortfolioScene() {
       
       {/* Ambient audio control */}
       <AmbientAudio />
+      
+      {/* GitHub Link */}
+      {!isLocked && (
+        <a
+          href="https://github.com/LuisCusihuaman"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed bottom-4 left-16 z-20 p-2 bg-neutral-900/80 backdrop-blur-sm rounded-lg border border-neutral-800 hover:bg-neutral-800 transition-colors flex items-center justify-center"
+          title="My GitHub"
+        >
+          <Github className="w-4 h-4 text-white" />
+        </a>
+      )}
     </div>
   )
 }
