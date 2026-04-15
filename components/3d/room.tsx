@@ -253,9 +253,10 @@ function HerringbonePattern() {
       planks.push(
         <mesh
           key={`plank-l-${x}-${z}`}
-          position={[x, 0.0025, z + (isOffset ? plankWidth : 0)]}
+          position={[x, 0.004, z + (isOffset ? plankWidth : 0)]}
           rotation={[-Math.PI / 2, 0, Math.PI / 4]}
           receiveShadow
+          renderOrder={1}
         >
           <planeGeometry args={[plankWidth, plankLength]} />
           <meshStandardMaterial
@@ -263,6 +264,7 @@ function HerringbonePattern() {
             roughness={0.42}
             transparent
             opacity={0.22}
+            depthWrite={false}
             polygonOffset
             polygonOffsetFactor={-2}
             polygonOffsetUnits={-2}
@@ -273,9 +275,10 @@ function HerringbonePattern() {
       planks.push(
         <mesh
           key={`plank-r-${x}-${z}`}
-          position={[x + plankLength * 0.7, 0.0025, z + (isOffset ? plankWidth : 0)]}
+          position={[x + plankLength * 0.7, 0.004, z + (isOffset ? plankWidth : 0)]}
           rotation={[-Math.PI / 2, 0, -Math.PI / 4]}
           receiveShadow
+          renderOrder={1}
         >
           <planeGeometry args={[plankWidth, plankLength]} />
           <meshStandardMaterial
@@ -283,6 +286,7 @@ function HerringbonePattern() {
             roughness={0.42}
             transparent
             opacity={0.18}
+            depthWrite={false}
             polygonOffset
             polygonOffsetFactor={-2}
             polygonOffsetUnits={-2}

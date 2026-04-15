@@ -31,8 +31,8 @@ const TV_WORLD_POSITION = new THREE.Vector3(
 )
 const TABLET_INTERACTION_DISTANCE = 1.9
 const TABLET_LOCAL_POSITION = new THREE.Vector3(-0.48, 0, 0.06)
-const CHAIR_INTERACTION_DISTANCE = 1.55
-const CHAIR_INITIAL_POSITION: [number, number, number] = [-0.95, 0, 0.45]
+const CHAIR_INTERACTION_DISTANCE = 1.95
+const CHAIR_INITIAL_POSITION: [number, number, number] = [-0.95, 0, 0.58]
 const RING_LIGHT_INTERACTION_DISTANCE = 2.2
 const RING_LIGHT_LOCAL_POSITION = new THREE.Vector3(1.72, 0, -0.02)
 const DESK_CONTROL_PANEL_LOCAL_X = 1.14
@@ -381,8 +381,8 @@ export function DeskSetup({ onObjectHover, onObjectClick, onWorkingMode }: DeskS
 
     const chairInteractionPoint = new THREE.Vector3(
       DESK_POSITION[0] + chairPosition[0],
-      0.72,
-      DESK_POSITION[2] + chairPosition[2] - 0.22,
+      0.82,
+      DESK_POSITION[2] + chairPosition[2] - 0.08,
     )
     const tabletWorldPos = new THREE.Vector3(
       DESK_POSITION[0] + TABLET_LOCAL_POSITION.x,
@@ -1770,60 +1770,38 @@ function OfficeChair({
   interactionActive?: boolean
   onWorkingMode?: (active: boolean) => void
 }) {
-  const [isDragging, setIsDragging] = useState(false)
   const [hovered, setHovered] = useState(false)
   const [isNearChair, setIsNearChair] = useState(false)
   const [isWorkingMode, setIsWorkingMode] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
-  const { camera, raycaster, mouse, gl } = useThree()
-  const floorPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), [])
+  const { camera, gl } = useThree()
   const originalCameraPos = useRef(new THREE.Vector3())
   const originalCameraQuaternion = useRef(new THREE.Quaternion())
   const isNearChairRef = useRef(false)
   const isWorkingModeRef = useRef(false)
   
-  // Handle dragging
   useFrame(() => {
     if (groupRef.current) {
-      const interactionPoint = groupRef.current.localToWorld(new THREE.Vector3(0, 0.72, 0.22))
+      const interactionPoint = groupRef.current.localToWorld(new THREE.Vector3(0, 0.82, -0.08))
       const near = camera.position.distanceTo(interactionPoint) < CHAIR_INTERACTION_DISTANCE
-      const nextIsNearChair = near && interactionActive && !isDragging
+      const nextIsNearChair = near && interactionActive
 
       if (nextIsNearChair !== isNearChairRef.current) {
         isNearChairRef.current = nextIsNearChair
         setIsNearChair(nextIsNearChair)
       }
     }
-
-    if (isDragging) {
-      raycaster.setFromCamera(mouse, camera)
-      const intersection = new THREE.Vector3()
-      raycaster.ray.intersectPlane(floorPlane, intersection)
-      
-      // Clamp to room bounds (smaller room now)
-      const clampedX = Math.max(-2, Math.min(2, intersection.x))
-      const clampedZ = Math.max(-1.5, Math.min(1.5, intersection.z))
-      
-      onPositionChange([clampedX, 0, clampedZ])
-    }
   })
   
-  // Mouse events for dragging
-  useEffect(() => {
-    const handleMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false)
-        gl.domElement.style.cursor = "auto"
-      }
-    }
-    
-    window.addEventListener("mouseup", handleMouseUp)
-    return () => window.removeEventListener("mouseup", handleMouseUp)
-  }, [isDragging, gl])
-
   useEffect(() => {
     isWorkingModeRef.current = isWorkingMode
   }, [isWorkingMode])
+
+  useEffect(() => {
+    if (interactionActive || isWorkingMode) return
+    setHovered(false)
+    gl.domElement.style.cursor = "auto"
+  }, [gl, interactionActive, isWorkingMode])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1837,7 +1815,7 @@ function OfficeChair({
         return
       }
 
-      if (!interactionActive || !isNearChairRef.current || !groupRef.current || isDragging) return
+      if (!interactionActive || !isNearChairRef.current || !groupRef.current) return
 
       originalCameraPos.current.copy(camera.position)
       originalCameraQuaternion.current.copy(camera.quaternion)
@@ -1855,47 +1833,27 @@ function OfficeChair({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [camera, deskHeight, interactionActive, isDragging, onWorkingMode])
-  
-  const handlePointerDown = (e: THREE.Event) => {
-    if (isWorkingMode) return
-    e.stopPropagation()
-    setIsDragging(true)
-    gl.domElement.style.cursor = "grabbing"
-  }
+  }, [camera, deskHeight, interactionActive, onWorkingMode])
   
   return (
     <group 
       ref={groupRef}
       position={position}
       rotation={[0, Math.PI, 0]}
-      onPointerDown={handlePointerDown}
-      onPointerEnter={() => {
-        if (isWorkingMode) return
-        setHovered(true)
-        gl.domElement.style.cursor = "grab"
-      }}
-      onPointerLeave={() => {
-        if (isWorkingMode) return
-        if (!isDragging) {
-          setHovered(false)
-          gl.domElement.style.cursor = "auto"
-        }
-      }}
     >
       {/* Seat */}
       <RoundedBox args={[0.5, 0.08, 0.45]} position={[0, 0.5, 0]} radius={0.02} smoothness={4} castShadow>
-        <meshStandardMaterial color={hovered || isDragging ? "#2a2a2a" : "#1a1a1a"} roughness={0.8} />
+        <meshStandardMaterial color={hovered ? "#2a2a2a" : "#1a1a1a"} roughness={0.8} />
       </RoundedBox>
       
       {/* Backrest */}
       <RoundedBox args={[0.48, 0.55, 0.06]} position={[0, 0.85, -0.2]} radius={0.02} smoothness={4} castShadow>
-        <meshStandardMaterial color={hovered || isDragging ? "#2a2a2a" : "#1a1a1a"} roughness={0.8} />
+        <meshStandardMaterial color={hovered ? "#2a2a2a" : "#1a1a1a"} roughness={0.8} />
       </RoundedBox>
       
       {/* Headrest */}
       <RoundedBox args={[0.25, 0.15, 0.05]} position={[0, 1.2, -0.22]} radius={0.02} smoothness={4} castShadow>
-        <meshStandardMaterial color={hovered || isDragging ? "#2a2a2a" : "#1a1a1a"} roughness={0.8} />
+        <meshStandardMaterial color={hovered ? "#2a2a2a" : "#1a1a1a"} roughness={0.8} />
       </RoundedBox>
       
       {/* Armrests */}
@@ -1944,18 +1902,28 @@ function OfficeChair({
           <meshStandardMaterial color="#2a2a2a" roughness={0.6} />
         </mesh>
       ))}
-      
-      {/* Drag hint */}
-      {hovered && !isDragging && !isNearChair && !isWorkingMode && (
-        <Html position={[0, 1.5, 0]} center>
-          <div className="bg-black/70 text-white px-3 py-1.5 rounded text-xs whitespace-nowrap backdrop-blur-sm border border-white/20">
-            Click and drag to move
-          </div>
-        </Html>
-      )}
 
-      {isNearChair && !isDragging && !isWorkingMode && (
-        <Html position={[0, 1.7, 0.06]} center>
+      <mesh
+        position={[0, 0.72, -0.02]}
+        onPointerEnter={(event) => {
+          if (isWorkingMode || !interactionActive) return
+          event.stopPropagation()
+          setHovered(true)
+          gl.domElement.style.cursor = "auto"
+        }}
+        onPointerLeave={() => {
+          if (isWorkingMode || !interactionActive) return
+          setHovered(false)
+          gl.domElement.style.cursor = "auto"
+        }}
+        visible={false}
+      >
+        <boxGeometry args={[0.92, 1.25, 0.88]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+
+      {isNearChair && !isWorkingMode && (
+        <Html position={[0, 1.18, 0.18]} center>
           <div className="bg-gradient-to-r from-slate-900/90 to-zinc-900/90 text-white px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap backdrop-blur-md border border-white/20 shadow-lg">
             Press [E] to sit and work
           </div>

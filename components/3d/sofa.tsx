@@ -10,9 +10,9 @@ interface SofaProps {
   onBurritoMode?: (active: boolean) => void
 }
 
-export const SOFA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.52, 0, 0.95)
-const SOFA_INTERACTION_POINT = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.72, 0.5, 0.95)
-const BURRITO_CAMERA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.74, 0.58, 0.98)
+export const SOFA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.52, 0, 1.3)
+const SOFA_INTERACTION_POINT = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.72, 0.5, 1.3)
+const BURRITO_CAMERA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.74, 0.58, 1.33)
 const BURRITO_CAMERA_ROTATION = new THREE.Euler(-0.42, Math.PI / 2, -0.18, "YXZ")
 
 export function Sofa({ onBurritoMode }: SofaProps) {
