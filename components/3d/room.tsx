@@ -10,7 +10,7 @@ const ROOM_WIDTH = 5
 const ROOM_BACK_EXTENT = 2
 const ROOM_FRONT_EXTENT = 4.2
 const ROOM_DEPTH = ROOM_BACK_EXTENT + ROOM_FRONT_EXTENT
-const ROOM_HEIGHT = 2.8
+const ROOM_HEIGHT = 3.05
 const ROOM_CENTER_Z = (ROOM_FRONT_EXTENT - ROOM_BACK_EXTENT) / 2
 
 // Export for use in other components
@@ -62,6 +62,8 @@ export function Room() {
         <meshStandardMaterial color="#fafafa" roughness={0.95} />
       </mesh>
 
+      <CeilingFan />
+
       {/* Baseboard trim */}
       <Baseboard />
       
@@ -70,6 +72,94 @@ export function Room() {
       
       {/* Door to bedroom - on the right wall, about two door widths away from the bathroom */}
       <Door position={[ROOM_WIDTH / 2 - 0.02, 0, 0.95]} rotation={[0, -Math.PI / 2, 0]} label="Habitación" />
+    </group>
+  )
+}
+
+function CeilingFan() {
+  const bladesRef = useRef<THREE.Group>(null)
+  const fanPosition: [number, number, number] = [0.15, ROOM_HEIGHT - 0.02, ROOM_CENTER_Z + 0.35]
+
+  useFrame((state) => {
+    if (!bladesRef.current) return
+    bladesRef.current.rotation.y = state.clock.elapsedTime * 2.6
+  })
+
+  return (
+    <group position={fanPosition}>
+      {/* Ceiling canopy */}
+      <mesh position={[0, -0.035, 0]} castShadow>
+        <cylinderGeometry args={[0.12, 0.16, 0.07, 24]} />
+        <meshStandardMaterial color="#ece7df" roughness={0.75} />
+      </mesh>
+
+      {/* Downrod */}
+      <mesh position={[0, -0.22, 0]} castShadow>
+        <cylinderGeometry args={[0.025, 0.025, 0.34, 16]} />
+        <meshStandardMaterial color="#8b6b4d" roughness={0.45} metalness={0.25} />
+      </mesh>
+
+      {/* Motor housing */}
+      <mesh position={[0, -0.44, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.16, 0.19, 0.22, 24]} />
+        <meshStandardMaterial color="#f2efe9" roughness={0.62} />
+      </mesh>
+
+      {/* Lower housing accent */}
+      <mesh position={[0, -0.55, 0]} castShadow>
+        <cylinderGeometry args={[0.12, 0.15, 0.08, 20]} />
+        <meshStandardMaterial color="#b38d64" roughness={0.4} metalness={0.2} />
+      </mesh>
+
+      {/* Blade assembly */}
+      <group ref={bladesRef} position={[0, -0.38, 0]}>
+        {[0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2].map((angle, index) => (
+          <group key={index} rotation={[0, angle, -0.05]}>
+            <mesh position={[0.62, 0, 0]} castShadow receiveShadow>
+              <boxGeometry args={[1.08, 0.025, 0.17]} />
+              <meshStandardMaterial color="#7f5f3f" roughness={0.55} />
+            </mesh>
+            <mesh position={[0.1, 0, 0]} castShadow>
+              <boxGeometry args={[0.16, 0.03, 0.12]} />
+              <meshStandardMaterial color="#a8835d" roughness={0.4} metalness={0.15} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+
+      {/* Light kit */}
+      <group position={[0, -0.62, 0]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.09, 0.11, 0.1, 18]} />
+          <meshStandardMaterial color="#f4f0e8" roughness={0.5} />
+        </mesh>
+
+        {[
+          [0, -0.04, 0.18],
+          [-0.16, -0.04, -0.08],
+          [0.16, -0.04, -0.08],
+        ].map((position, index) => (
+          <group key={index} position={position as [number, number, number]}>
+            <mesh castShadow>
+              <sphereGeometry args={[0.08, 18, 18]} />
+              <meshStandardMaterial
+                color="#fff6e5"
+                emissive="#ffd29a"
+                emissiveIntensity={0.45}
+                roughness={0.25}
+                transparent
+                opacity={0.92}
+              />
+            </mesh>
+            <mesh position={[0, 0.08, 0]}>
+              <cylinderGeometry args={[0.015, 0.015, 0.08, 10]} />
+              <meshStandardMaterial color="#a8835d" roughness={0.35} metalness={0.25} />
+            </mesh>
+          </group>
+        ))}
+
+        <pointLight position={[0, -0.02, 0]} intensity={0.28} distance={4.8} color="#fff1d6" />
+      </group>
     </group>
   )
 }
@@ -152,49 +242,56 @@ function Door({ position, rotation, label }: { position: [number, number, number
 }
 
 function HerringbonePattern() {
-  // Create visual herringbone pattern with lighter planks
   const planks = []
   const plankWidth = 0.15
   const plankLength = 0.6
   
   for (let x = -ROOM_WIDTH / 2; x < ROOM_WIDTH / 2; x += plankLength * 1.4) {
     for (let z = -ROOM_BACK_EXTENT; z < ROOM_FRONT_EXTENT; z += plankWidth * 2.2) {
-      const isOffset = Math.floor((x + ROOM_WIDTH/2) / (plankLength * 1.4)) % 2 === 0
-      // Left-leaning plank
+      const isOffset = Math.floor((x + ROOM_WIDTH / 2) / (plankLength * 1.4)) % 2 === 0
+
       planks.push(
-        <mesh 
+        <mesh
           key={`plank-l-${x}-${z}`}
-          position={[x, 0.001, z + (isOffset ? plankWidth : 0)]} 
+          position={[x, 0.0025, z + (isOffset ? plankWidth : 0)]}
           rotation={[-Math.PI / 2, 0, Math.PI / 4]}
+          receiveShadow
         >
           <planeGeometry args={[plankWidth, plankLength]} />
-          <meshStandardMaterial 
-            color="#9a7b5a" 
-            roughness={0.4}
+          <meshStandardMaterial
+            color="#9a7b5a"
+            roughness={0.42}
             transparent
-            opacity={0.3}
+            opacity={0.22}
+            polygonOffset
+            polygonOffsetFactor={-2}
+            polygonOffsetUnits={-2}
           />
         </mesh>
       )
-      // Right-leaning plank
+
       planks.push(
-        <mesh 
+        <mesh
           key={`plank-r-${x}-${z}`}
-          position={[x + plankLength * 0.7, 0.001, z + (isOffset ? plankWidth : 0)]} 
+          position={[x + plankLength * 0.7, 0.0025, z + (isOffset ? plankWidth : 0)]}
           rotation={[-Math.PI / 2, 0, -Math.PI / 4]}
+          receiveShadow
         >
           <planeGeometry args={[plankWidth, plankLength]} />
-          <meshStandardMaterial 
-            color="#7a5b3a" 
-            roughness={0.4}
+          <meshStandardMaterial
+            color="#7a5b3a"
+            roughness={0.42}
             transparent
-            opacity={0.25}
+            opacity={0.18}
+            polygonOffset
+            polygonOffsetFactor={-2}
+            polygonOffsetUnits={-2}
           />
         </mesh>
       )
     }
   }
-  
+
   return <group>{planks}</group>
 }
 

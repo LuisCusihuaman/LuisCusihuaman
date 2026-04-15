@@ -8,11 +8,20 @@ import { RoundedBox, Html } from "@react-three/drei"
 interface DeskSetupProps {
   onObjectHover: (object: string | null) => void
   onObjectClick: (object: string) => void
+  onWorkingMode?: (active: boolean) => void
 }
 
 export const DESK_POSITION: [number, number, number] = [-1.1, 0, -1.6]
 
 const DESK_WORLD_POSITION = new THREE.Vector3(...DESK_POSITION)
+const PIANO_INTERACTION_DISTANCE = 2
+const PIANO_EXTENDED_OFFSET = 0.24
+const PIANO_ACCESS_MIN_X = DESK_POSITION[0] + 0.48
+const PIANO_INTERACTION_POINT = new THREE.Vector3(
+  DESK_POSITION[0] + 0.72,
+  0.72,
+  DESK_POSITION[2] + 0.34,
+)
 const TV_INTERACTION_DISTANCE = 2.25
 const TV_LOCAL_POSITION = new THREE.Vector3(0, 1.7, -0.34)
 const TV_WORLD_POSITION = new THREE.Vector3(
@@ -21,6 +30,17 @@ const TV_WORLD_POSITION = new THREE.Vector3(
   DESK_POSITION[2] + TV_LOCAL_POSITION.z,
 )
 const TABLET_INTERACTION_DISTANCE = 1.9
+const TABLET_LOCAL_POSITION = new THREE.Vector3(-0.48, 0, 0.06)
+const CHAIR_INTERACTION_DISTANCE = 1.55
+const CHAIR_INITIAL_POSITION: [number, number, number] = [-0.95, 0, 0.45]
+const RING_LIGHT_INTERACTION_DISTANCE = 2.2
+const RING_LIGHT_LOCAL_POSITION = new THREE.Vector3(1.72, 0, -0.02)
+const DESK_CONTROL_PANEL_LOCAL_X = 1.14
+const DESK_CONTROL_PANEL_LOCAL_Z = -0.24
+const DESK_CONTROL_PANEL_LOCAL_Y_OFFSET = 0.03
+const DESK_CONTROL_PANEL_INTERACTION_DISTANCE = 0.9
+
+type DeskInteractionTarget = "chair" | "piano" | "tv" | "tablet"
 
 function createMacDesktopTexture() {
   const canvas = document.createElement("canvas")
@@ -329,12 +349,16 @@ function roundRect(
   ctx.closePath()
 }
 
-export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
+export function DeskSetup({ onObjectHover, onObjectClick, onWorkingMode }: DeskSetupProps) {
   const [deskHeight, setDeskHeight] = useState(0.75) // Default sitting height
   const [isAdjusting, setIsAdjusting] = useState(false)
+  const [chairPosition, setChairPosition] = useState<[number, number, number]>(CHAIR_INITIAL_POSITION)
+  const [activeInteractionTarget, setActiveInteractionTarget] = useState<DeskInteractionTarget | null>(null)
   const targetHeight = useRef(0.75)
+  const activeInteractionTargetRef = useRef<DeskInteractionTarget | null>(null)
   const { camera } = useThree()
   const groupRef = useRef<THREE.Group>(null)
+  const isDeskMoving = Math.abs(deskHeight - targetHeight.current) > 0.01
   
   // Smooth desk height animation
   useFrame(() => {
@@ -346,8 +370,48 @@ export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
   // Check proximity for desk adjustment
   useFrame(() => {
     if (!groupRef.current) return
-    const dist = camera.position.distanceTo(DESK_WORLD_POSITION)
-    setIsAdjusting(dist < 2)
+    const controlPanelWorldX = DESK_POSITION[0] + DESK_CONTROL_PANEL_LOCAL_X
+    const controlPanelWorldZ = DESK_POSITION[2] + DESK_CONTROL_PANEL_LOCAL_Z
+    const horizontalDistToPanel = Math.hypot(
+      camera.position.x - controlPanelWorldX,
+      camera.position.z - controlPanelWorldZ,
+    )
+    const isNearControlPanel = horizontalDistToPanel < DESK_CONTROL_PANEL_INTERACTION_DISTANCE
+    setIsAdjusting(isNearControlPanel)
+
+    const chairInteractionPoint = new THREE.Vector3(
+      DESK_POSITION[0] + chairPosition[0],
+      0.72,
+      DESK_POSITION[2] + chairPosition[2] - 0.22,
+    )
+    const tabletWorldPos = new THREE.Vector3(
+      DESK_POSITION[0] + TABLET_LOCAL_POSITION.x,
+      deskHeight + 0.16,
+      DESK_POSITION[2] + TABLET_LOCAL_POSITION.z,
+    )
+
+    const nextTarget =
+      [
+        { id: "chair" as const, dist: camera.position.distanceTo(chairInteractionPoint), threshold: CHAIR_INTERACTION_DISTANCE },
+        {
+          id: "piano" as const,
+          dist: camera.position.distanceTo(PIANO_INTERACTION_POINT),
+          threshold: !isNearControlPanel && camera.position.x >= PIANO_ACCESS_MIN_X ? PIANO_INTERACTION_DISTANCE : 0,
+        },
+        { id: "tv" as const, dist: camera.position.distanceTo(TV_WORLD_POSITION), threshold: TV_INTERACTION_DISTANCE },
+        { id: "tablet" as const, dist: camera.position.distanceTo(tabletWorldPos), threshold: TABLET_INTERACTION_DISTANCE },
+      ]
+        .filter(({ dist, threshold }) => dist < threshold)
+        .sort((a, b) => {
+          const aScore = a.dist / a.threshold + (a.id === activeInteractionTargetRef.current ? -0.05 : 0)
+          const bScore = b.dist / b.threshold + (b.id === activeInteractionTargetRef.current ? -0.05 : 0)
+          return aScore - bScore
+        })[0]?.id ?? null
+
+    if (nextTarget !== activeInteractionTargetRef.current) {
+      activeInteractionTargetRef.current = nextTarget
+      setActiveInteractionTarget(nextTarget)
+    }
   })
   
   // Handle desk height adjustment with Q/Z keys
@@ -367,16 +431,30 @@ export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
   return (
     <group ref={groupRef} position={DESK_POSITION}>
       {/* Main Desk - Standing desk with adjustable height */}
-      <StandingDesk height={deskHeight} isAdjusting={isAdjusting} />
+      <StandingDesk height={deskHeight} isAdjusting={isAdjusting} isMoving={isDeskMoving} />
       
       {/* Piano keyboard under desk - slides out */}
-      <Piano deskHeight={deskHeight} onHover={onObjectHover} onClick={onObjectClick} />
+      <Piano
+        deskHeight={deskHeight}
+        onHover={onObjectHover}
+        onClick={onObjectClick}
+        interactionActive={activeInteractionTarget === "piano"}
+      />
       
       {/* Wall-mounted TV - Bigger and lower */}
-      <TV onHover={onObjectHover} onClick={onObjectClick} />
+      <TV
+        onHover={onObjectHover}
+        onClick={onObjectClick}
+        interactionActive={activeInteractionTarget === "tv"}
+      />
       
       {/* Drawing Tablet - Better model */}
-      <DrawingTablet deskHeight={deskHeight} onHover={onObjectHover} onClick={onObjectClick} />
+      <DrawingTablet
+        deskHeight={deskHeight}
+        onHover={onObjectHover}
+        onClick={onObjectClick}
+        interactionActive={activeInteractionTarget === "tablet"}
+      />
       
       {/* Laptop */}
       <Laptop deskHeight={deskHeight} onHover={onObjectHover} onClick={onObjectClick} />
@@ -397,7 +475,7 @@ export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
       <Microphone deskHeight={deskHeight} onHover={onObjectHover} onClick={onObjectClick} />
       
       {/* Ring Light */}
-      <RingLight />
+      <RingLight onHover={onObjectHover} />
       
       {/* Webcam */}
       <Webcam deskHeight={deskHeight} />
@@ -409,7 +487,13 @@ export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
       <Dock deskHeight={deskHeight} />
       
       {/* Office Chair */}
-      <OfficeChair />
+      <OfficeChair
+        deskHeight={deskHeight}
+        position={chairPosition}
+        onPositionChange={setChairPosition}
+        interactionActive={activeInteractionTarget === "chair"}
+        onWorkingMode={onWorkingMode}
+      />
       
       {/* Orange Plushie */}
       <Plushie deskHeight={deskHeight} />
@@ -420,11 +504,12 @@ export function DeskSetup({ onObjectHover, onObjectClick }: DeskSetupProps) {
   )
 }
 
-function StandingDesk({ height, isAdjusting }: { height: number; isAdjusting: boolean }) {
+function StandingDesk({ height, isAdjusting, isMoving }: { height: number; isAdjusting: boolean; isMoving: boolean }) {
   const deskWidth = 2.4
   const deskDepth = 0.65
   const legHeight = height - 0.03
   const legWidth = 0.06
+  const displayValue = Math.round(height * 100)
   
   return (
     <group>
@@ -485,20 +570,65 @@ function StandingDesk({ height, isAdjusting }: { height: number; isAdjusting: bo
       </mesh>
       
       {/* Control panel on right side */}
-      <group position={[deskWidth / 2 - 0.2, height + 0.025, deskDepth / 2 - 0.1]}>
-        <RoundedBox args={[0.12, 0.02, 0.06]} radius={0.005} smoothness={4}>
-          <meshStandardMaterial color="#1a1a1a" roughness={0.5} metalness={0.3} />
+      <group
+        position={[DESK_CONTROL_PANEL_LOCAL_X, height + DESK_CONTROL_PANEL_LOCAL_Y_OFFSET, DESK_CONTROL_PANEL_LOCAL_Z]}
+        rotation={[0, 0, 0]}
+      >
+        <RoundedBox args={[0.11, 0.032, 0.22]} radius={0.008} smoothness={4} castShadow>
+          <meshStandardMaterial color="#141414" roughness={0.35} metalness={0.3} />
         </RoundedBox>
-        {/* Display */}
-        <mesh position={[0, 0.011, 0]}>
-          <planeGeometry args={[0.06, 0.025]} />
-          <meshStandardMaterial color="#001a00" emissive="#003300" emissiveIntensity={0.3} />
+
+        {/* Display housing */}
+        <mesh position={[0, 0.017, -0.05]} castShadow>
+          <boxGeometry args={[0.048, 0.01, 0.09]} />
+          <meshStandardMaterial color="#0a120a" roughness={0.3} metalness={0.15} />
         </mesh>
+
+        {/* Display */}
+        <mesh position={[0, 0.024, -0.05]}>
+          <planeGeometry args={[0.035, 0.082]} />
+          <meshStandardMaterial
+            color={isAdjusting ? "#0f2b18" : "#08150c"}
+            emissive={isAdjusting ? "#49ff8f" : "#12381f"}
+            emissiveIntensity={isAdjusting ? 1.15 : 0.45}
+          />
+        </mesh>
+        <Html position={[0, 0.026, -0.05]} transform sprite scale={0.032} center>
+          <div className="font-mono text-[18px] tracking-[0.2em] text-emerald-300">
+            {displayValue}
+          </div>
+        </Html>
+
         {/* Buttons */}
-        {[-0.04, 0.04].map((x, i) => (
-          <mesh key={i} position={[x, 0.012, 0]}>
-            <cylinderGeometry args={[0.008, 0.008, 0.004, 12]} />
-            <meshStandardMaterial color="#333333" roughness={0.4} />
+        {[
+          { z: 0.035, active: isAdjusting, label: "Q" },
+          { z: 0.08, active: isAdjusting, label: "Z" },
+        ].map(({ z, active, label }) => (
+          <group key={label} position={[0.028, 0.018, z]}>
+            <mesh>
+              <cylinderGeometry args={[0.014, 0.014, 0.01, 14]} />
+              <meshStandardMaterial
+                color={active ? "#505050" : "#2d2d2d"}
+                roughness={0.35}
+                metalness={0.18}
+              />
+            </mesh>
+            <Html position={[0, 0.01, 0.01]} transform sprite scale={0.02} center>
+              <div className="font-mono text-[14px] text-neutral-200">
+                {label}
+              </div>
+            </Html>
+          </group>
+        ))}
+
+        {/* Status LEDs */}
+        {[
+          { z: -0.095, color: isAdjusting ? "#49ff8f" : "#163c22", intensity: isAdjusting ? 2.1 : 0.15 },
+          { z: -0.072, color: isMoving ? "#ffb54a" : "#47320e", intensity: isMoving ? 1.8 : 0.12 },
+        ].map(({ z, color, intensity }, index) => (
+          <mesh key={index} position={[0, 0.023, z]}>
+            <sphereGeometry args={[0.006, 10, 10]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={intensity} />
           </mesh>
         ))}
       </group>
@@ -515,9 +645,9 @@ function StandingDesk({ height, isAdjusting }: { height: number; isAdjusting: bo
       
       {/* Adjustment hint */}
       {isAdjusting && (
-        <Html position={[0, height + 0.3, 0.4]} center>
-          <div className="bg-black/70 text-white px-3 py-1 rounded text-xs whitespace-nowrap backdrop-blur-sm">
-            [Q] Up / [Z] Down
+        <Html position={[DESK_CONTROL_PANEL_LOCAL_X + 0.02, height + 0.24, DESK_CONTROL_PANEL_LOCAL_Z - 0.02]} center>
+          <div className="bg-black/75 text-white px-3 py-1.5 rounded text-xs whitespace-nowrap backdrop-blur-sm border border-white/15">
+            Standing Desk Controls: [Q] Up / [Z] Down
           </div>
         </Html>
       )}
@@ -529,6 +659,7 @@ interface InteractiveProps {
   onHover: (object: string | null) => void
   onClick: (object: string) => void
   deskHeight?: number
+  interactionActive?: boolean
 }
 
 // Multiple reggaeton melodies to randomly choose from
@@ -573,13 +704,17 @@ const keyToNote: Record<number, string> = {
   0: 'C4', 1: 'D4', 2: 'E4', 3: 'F4', 4: 'G4', 5: 'A4', 6: 'B4', 7: 'C5',
 }
 
-function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
+function Piano({ deskHeight = 0.75, onHover, onClick, interactionActive = true }: InteractiveProps) {
   const [hovered, setHovered] = useState(false)
   const [isExtended, setIsExtended] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [activeKeys, setActiveKeys] = useState<number[]>([])
   const [showPrompt, setShowPrompt] = useState(false)
+  const [promptPosition, setPromptPosition] = useState<[number, number, number]>([0.72, 0.17, 0.19])
   const [currentMelody, setCurrentMelody] = useState(0)
+  const [isHandleHovered, setIsHandleHovered] = useState(false)
+  const isNearRef = useRef(false)
+  const isHandleHoveredRef = useRef(false)
   const groupRef = useRef<THREE.Group>(null)
   const slidePosition = useRef(0)
   const targetSlide = useRef(0)
@@ -592,6 +727,17 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
   const pianoDepth = 0.28
   const pianoHeight = 0.08
   const numWhiteKeys = 52
+
+  const updatePromptPositionFromEvent = (event: { point: THREE.Vector3 }) => {
+    if (!groupRef.current) return
+
+    const localPoint = groupRef.current.worldToLocal(event.point.clone())
+    setPromptPosition([
+      Math.max(0.55, Math.min(0.98, localPoint.x)),
+      Math.max(0.12, localPoint.y + 0.14),
+      Math.max(pianoDepth / 2 + 0.015, localPoint.z + 0.06),
+    ])
+  }
 
   // Get or create audio context
   const getAudioContext = () => {
@@ -641,18 +787,29 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
   // Check proximity for showing prompt
   useFrame(() => {
     if (!groupRef.current) return
+    const canAccessFromHere = camera.position.x >= PIANO_ACCESS_MIN_X
     const pianoWorldPos = new THREE.Vector3(
       DESK_POSITION[0],
       deskHeight - 0.12,
       DESK_POSITION[2] + slidePosition.current,
     )
     const dist = camera.position.distanceTo(pianoWorldPos)
-    setShowPrompt(dist < 2)
+    isNearRef.current = dist < PIANO_INTERACTION_DISTANCE && canAccessFromHere
+
+    if ((!isNearRef.current || !interactionActive) && isHandleHoveredRef.current && !isExtended) {
+      isHandleHoveredRef.current = false
+      setIsHandleHovered(false)
+      setHovered(false)
+      onHover(null)
+      document.body.style.cursor = "auto"
+    }
+
+    setShowPrompt(isNearRef.current && interactionActive && isHandleHoveredRef.current && !isExtended)
   })
   
   // Animate slide - slides OUT towards player (positive Z)
   useFrame(() => {
-    targetSlide.current = isExtended ? 0.8 : 0
+    targetSlide.current = isExtended ? PIANO_EXTENDED_OFFSET : 0
     slidePosition.current += (targetSlide.current - slidePosition.current) * 0.06
     if (groupRef.current) {
       groupRef.current.position.z = 0.15 + slidePosition.current
@@ -714,13 +871,14 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
   // Handle E key for piano extension
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "KeyE" && showPrompt) {
-        if (!isExtended) {
-          setIsExtended(true)
-        } else {
-          setIsExtended(false)
-          stopPlaying()
-        }
+      if (e.code !== "KeyE" || e.repeat) return
+      if (!isExtended && (!interactionActive || !isNearRef.current || !isHandleHoveredRef.current)) return
+
+      if (!isExtended) {
+        setIsExtended(true)
+      } else {
+        setIsExtended(false)
+        stopPlaying()
       }
     }
     window.addEventListener("keydown", handleKeyDown)
@@ -728,7 +886,7 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
       window.removeEventListener("keydown", handleKeyDown)
       stopPlaying()
     }
-  }, [showPrompt, isExtended])
+  }, [interactionActive, isExtended])
 
   // Stop music when piano closes
   useEffect(() => {
@@ -738,12 +896,7 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
   }, [isExtended])
   
   return (
-    <group
-      ref={groupRef}
-      position={[0, deskHeight - 0.12, 0.15]}
-      onPointerEnter={() => { setHovered(true); onHover("piano") }}
-      onPointerLeave={() => { setHovered(false); onHover(null) }}
-    >
+    <group ref={groupRef} position={[0, deskHeight - 0.12, 0.15]}>
       {/* Piano body - wider for easier clicking */}
       <RoundedBox args={[pianoWidth, pianoHeight, pianoDepth]} radius={0.01} smoothness={4} castShadow>
         <meshStandardMaterial 
@@ -753,6 +906,62 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
           emissive={isPlaying ? "#221100" : "#000000"}
         />
       </RoundedBox>
+
+      {/* Front-right tray lip: visual edge plus a larger invisible hit area */}
+      <mesh
+        position={[0.68, 0.02, pianoDepth / 2 + 0.03]}
+        onPointerEnter={() => {
+          if (!interactionActive || !isNearRef.current || isExtended) return
+          isHandleHoveredRef.current = true
+          setIsHandleHovered(true)
+          setHovered(true)
+          onHover("piano")
+          document.body.style.cursor = "pointer"
+        }}
+        onPointerMove={(event) => {
+          if (!interactionActive || !isNearRef.current || isExtended) return
+          updatePromptPositionFromEvent(event)
+        }}
+        onPointerLeave={() => {
+          if (isExtended) return
+          isHandleHoveredRef.current = false
+          setIsHandleHovered(false)
+          setHovered(false)
+          onHover(null)
+          document.body.style.cursor = "auto"
+        }}
+      >
+        <boxGeometry args={[0.56, 0.12, 0.16]} />
+        <meshStandardMaterial transparent opacity={0.01} depthWrite={false} />
+      </mesh>
+
+      <mesh
+        position={[0.74, -0.005, pianoDepth / 2 + 0.012]}
+        castShadow
+        onPointerEnter={() => {
+          if (!interactionActive || !isNearRef.current || isExtended) return
+          isHandleHoveredRef.current = true
+          setIsHandleHovered(true)
+          setHovered(true)
+          onHover("piano")
+          document.body.style.cursor = "pointer"
+        }}
+        onPointerLeave={() => {
+          if (isExtended) return
+          isHandleHoveredRef.current = false
+          setIsHandleHovered(false)
+          setHovered(false)
+          onHover(null)
+          document.body.style.cursor = "auto"
+        }}
+      >
+        <boxGeometry args={[0.3, 0.035, 0.055]} />
+        <meshStandardMaterial
+          color={isHandleHovered ? "#474747" : "#2f2f2f"}
+          roughness={0.5}
+          metalness={0.12}
+        />
+      </mesh>
       
       {/* Control panel on left */}
       <mesh position={[-pianoWidth/2 + 0.08, 0.045, 0]}>
@@ -820,9 +1029,9 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
       
       {/* Interaction prompt */}
       {showPrompt && !isExtended && (
-        <Html position={[0, 0.2, 0.1]} center>
+        <Html position={promptPosition} center>
           <div className="bg-black/80 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap backdrop-blur-sm border border-white/20">
-            Press [E] to slide out piano
+            Press [E] to pull out piano tray
           </div>
         </Html>
       )}
@@ -839,7 +1048,7 @@ function Piano({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
   )
 }
 
-function TV({ onHover, onClick }: Omit<InteractiveProps, 'deskHeight'>) {
+function TV({ onHover, onClick, interactionActive = true }: Omit<InteractiveProps, "deskHeight">) {
   const [hovered, setHovered] = useState(false)
   const isNearRef = useRef(false)
   const screenPower = useRef(0)
@@ -866,7 +1075,7 @@ function TV({ onHover, onClick }: Omit<InteractiveProps, 'deskHeight'>) {
       screenRef.current.emissiveIntensity = glow * screenPower.current
     }
 
-    if (!near && isNearRef.current) {
+    if ((!near || !interactionActive) && isNearRef.current) {
       setHovered(false)
       onHover(null)
     }
@@ -879,14 +1088,14 @@ function TV({ onHover, onClick }: Omit<InteractiveProps, 'deskHeight'>) {
     <group
       position={TV_LOCAL_POSITION}
       onPointerEnter={() => {
-        if (!isNearRef.current) return
+        if (!isNearRef.current || !interactionActive) return
         setHovered(true)
         onHover("tv")
       }}
       onPointerLeave={() => { setHovered(false); onHover(null) }}
       onClick={(event) => {
         event.stopPropagation()
-        if (!isNearRef.current) return
+        if (!isNearRef.current || !interactionActive) return
         onClick("tv")
       }}
     >
@@ -936,7 +1145,7 @@ function TV({ onHover, onClick }: Omit<InteractiveProps, 'deskHeight'>) {
   )
 }
 
-function DrawingTablet({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
+function DrawingTablet({ deskHeight = 0.75, onHover, onClick, interactionActive = true }: InteractiveProps) {
   const [hovered, setHovered] = useState(false)
   const isNearRef = useRef(false)
   const screenPower = useRef(0)
@@ -951,7 +1160,11 @@ function DrawingTablet({ deskHeight = 0.75, onHover, onClick }: InteractiveProps
   }, [tabletTexture])
   
   useFrame(() => {
-    const tabletWorldPos = new THREE.Vector3(DESK_POSITION[0] - 0.48, deskHeight + 0.16, DESK_POSITION[2] + 0.06)
+    const tabletWorldPos = new THREE.Vector3(
+      DESK_POSITION[0] + TABLET_LOCAL_POSITION.x,
+      deskHeight + 0.16,
+      DESK_POSITION[2] + TABLET_LOCAL_POSITION.z,
+    )
     const near = camera.position.distanceTo(tabletWorldPos) < TABLET_INTERACTION_DISTANCE
     screenPower.current += ((near ? 1 : 0) - screenPower.current) * 0.12
 
@@ -964,7 +1177,7 @@ function DrawingTablet({ deskHeight = 0.75, onHover, onClick }: InteractiveProps
       screenRef.current.emissiveIntensity = glow * screenPower.current
     }
 
-    if (!near && isNearRef.current) {
+    if ((!near || !interactionActive) && isNearRef.current) {
       setHovered(false)
       onHover(null)
     }
@@ -975,17 +1188,17 @@ function DrawingTablet({ deskHeight = 0.75, onHover, onClick }: InteractiveProps
   // Better modeled drawing tablet
   return (
     <group
-      position={[-0.48, deskHeight + 0.16, 0.06]}
+      position={[TABLET_LOCAL_POSITION.x, deskHeight + 0.16, TABLET_LOCAL_POSITION.z]}
       rotation={[-0.52, 0.04, 0]}
       onPointerEnter={() => {
-        if (!isNearRef.current) return
+        if (!isNearRef.current || !interactionActive) return
         setHovered(true)
         onHover("tablet")
       }}
       onPointerLeave={() => { setHovered(false); onHover(null) }}
       onClick={(event) => {
         event.stopPropagation()
-        if (!isNearRef.current) return
+        if (!isNearRef.current || !interactionActive) return
         onClick("tablet")
       }}
     >
@@ -1314,48 +1527,137 @@ function Microphone({ deskHeight = 0.75, onHover, onClick }: InteractiveProps) {
   )
 }
 
-function RingLight() {
+function RingLight({ onHover }: { onHover: (object: string | null) => void }) {
+  const [isHovered, setIsHovered] = useState(false)
+  const [isActive, setIsActive] = useState(false)
+  const isNearRef = useRef(false)
+  const ringMaterialRef = useRef<THREE.MeshStandardMaterial>(null)
+  const glowLightRef = useRef<THREE.PointLight>(null)
+  const { camera } = useThree()
+  const cycleColors = useMemo(
+    () => ["#fffaf0", "#ff4d4d", "#45e07d", "#4f7dff", "#fffaf0"].map((color) => new THREE.Color(color)),
+    [],
+  )
+
+  useFrame(({ clock }) => {
+    if (!ringMaterialRef.current || !glowLightRef.current) return
+
+    const ringWorldPos = new THREE.Vector3(
+      DESK_POSITION[0] + RING_LIGHT_LOCAL_POSITION.x,
+      1.8,
+      DESK_POSITION[2] + RING_LIGHT_LOCAL_POSITION.z + 0.2,
+    )
+    const near = camera.position.distanceTo(ringWorldPos) < RING_LIGHT_INTERACTION_DISTANCE
+
+    if (!near && isNearRef.current) {
+      setIsHovered(false)
+      onHover(null)
+    }
+
+    isNearRef.current = near
+
+    const targetColor = new THREE.Color("#fffaf0")
+    if (isActive) {
+      const phase = (clock.getElapsedTime() * 1.5) % cycleColors.length
+      const currentIndex = Math.floor(phase)
+      const nextIndex = (currentIndex + 1) % cycleColors.length
+      const blend = phase - currentIndex
+      targetColor.copy(cycleColors[currentIndex]).lerp(cycleColors[nextIndex], blend)
+    }
+
+    ringMaterialRef.current.emissive.lerp(targetColor, 0.18)
+    ringMaterialRef.current.color.lerp(targetColor, 0.12)
+    glowLightRef.current.color.lerp(targetColor, 0.18)
+    glowLightRef.current.intensity = THREE.MathUtils.lerp(
+      glowLightRef.current.intensity,
+      isActive ? 0.65 : 0.3,
+      0.14,
+    )
+  })
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.code !== "KeyE" || !isNearRef.current || !isHovered) return
+      setIsActive((current) => !current)
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isHovered])
+
   return (
-    <group position={[1.3, 0.1, 0.2]}>
-      {/* Tripod legs */}
-      {[0, 1, 2].map((i) => (
-        <mesh 
-          key={i} 
-          position={[
-            Math.sin((i * Math.PI * 2) / 3) * 0.15,
-            0.5,
-            Math.cos((i * Math.PI * 2) / 3) * 0.15
-          ]}
-          rotation={[Math.sin((i * Math.PI * 2) / 3) * 0.2, 0, Math.cos((i * Math.PI * 2) / 3) * 0.2]}
-          castShadow
-        >
-          <cylinderGeometry args={[0.01, 0.012, 1.0, 8]} />
-          <meshStandardMaterial color="#1a1a1a" roughness={0.7} metalness={0.2} />
-        </mesh>
-      ))}
-      
-      {/* Center pole */}
-      <mesh position={[0, 1.1, 0]} castShadow>
-        <cylinderGeometry args={[0.015, 0.015, 1.2, 8]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.7} metalness={0.2} />
+    <group position={[RING_LIGHT_LOCAL_POSITION.x, RING_LIGHT_LOCAL_POSITION.y, RING_LIGHT_LOCAL_POSITION.z]} rotation={[0, -Math.PI / 2, 0]}>
+      {/* Floor base */}
+      <mesh position={[0, 0.03, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.16, 0.18, 0.06, 18]} />
+        <meshStandardMaterial color="#151515" roughness={0.8} metalness={0.12} />
       </mesh>
-      
+
+      {/* Stand pole */}
+      <mesh position={[0, 0.86, 0]} castShadow>
+        <cylinderGeometry args={[0.018, 0.022, 1.72, 12]} />
+        <meshStandardMaterial color="#242424" roughness={0.52} metalness={0.28} />
+      </mesh>
+
+      {/* Neck arm */}
+      <mesh position={[0, 1.66, 0.08]} rotation={[0.35, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.012, 0.012, 0.24, 10]} />
+        <meshStandardMaterial color="#2b2b2b" roughness={0.56} metalness={0.22} />
+      </mesh>
+
       {/* Ring light */}
-      <group position={[0, 1.65, -0.05]} rotation={[0.2, 0, 0]}>
-        <mesh>
-          <torusGeometry args={[0.15, 0.02, 8, 32]} />
-          <meshStandardMaterial 
-            color="#f5f5f0" 
+      <group position={[0, 1.8, 0.2]} rotation={[0, 0, 0]}>
+        <mesh
+          castShadow
+          onPointerOver={(event) => {
+            event.stopPropagation()
+            if (!isNearRef.current) return
+            setIsHovered(true)
+            onHover("ring light")
+          }}
+          onPointerOut={() => {
+            setIsHovered(false)
+            onHover(null)
+          }}
+        >
+          <torusGeometry args={[0.22, 0.022, 10, 36]} />
+          <meshStandardMaterial
+            ref={ringMaterialRef}
+            color="#f5f5f0"
             emissive="#fffaf0"
-            emissiveIntensity={0.8}
-            roughness={0.3}
+            emissiveIntensity={1.0}
+            roughness={0.24}
           />
+        </mesh>
+        <mesh
+          onPointerOver={(event) => {
+            event.stopPropagation()
+            if (!isNearRef.current) return
+            setIsHovered(true)
+            onHover("ring light")
+          }}
+          onPointerOut={() => {
+            setIsHovered(false)
+            onHover(null)
+          }}
+          visible={false}
+        >
+          <sphereGeometry args={[0.38, 18, 18]} />
+          <meshBasicMaterial transparent opacity={0} />
         </mesh>
         {/* Inner ring */}
         <mesh>
-          <torusGeometry args={[0.15, 0.008, 8, 32]} />
+          <torusGeometry args={[0.22, 0.008, 8, 36]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.7} />
         </mesh>
+        <pointLight ref={glowLightRef} position={[0, 0, 0]} intensity={0.3} distance={4} color="#fff7ea" />
+        {isHovered && isNearRef.current && (
+          <Html position={[0, -0.34, 0]} center>
+            <div className="bg-black/75 text-white px-3 py-1.5 rounded text-xs whitespace-nowrap backdrop-blur-sm border border-white/15">
+              {isActive ? "Press [E] to turn off RGB ring" : "Press [E] to turn on RGB ring"}
+            </div>
+          </Html>
+        )}
       </group>
     </group>
   )
@@ -1455,16 +1757,44 @@ function Dock({ deskHeight = 0.75 }: { deskHeight: number }) {
   )
 }
 
-function OfficeChair() {
+function OfficeChair({
+  deskHeight,
+  position,
+  onPositionChange,
+  interactionActive = true,
+  onWorkingMode,
+}: {
+  deskHeight: number
+  position: [number, number, number]
+  onPositionChange: (position: [number, number, number]) => void
+  interactionActive?: boolean
+  onWorkingMode?: (active: boolean) => void
+}) {
   const [isDragging, setIsDragging] = useState(false)
-  const [position, setPosition] = useState<[number, number, number]>([-0.95, 0, 0.45])
   const [hovered, setHovered] = useState(false)
+  const [isNearChair, setIsNearChair] = useState(false)
+  const [isWorkingMode, setIsWorkingMode] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
   const { camera, raycaster, mouse, gl } = useThree()
   const floorPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), [])
+  const originalCameraPos = useRef(new THREE.Vector3())
+  const originalCameraQuaternion = useRef(new THREE.Quaternion())
+  const isNearChairRef = useRef(false)
+  const isWorkingModeRef = useRef(false)
   
   // Handle dragging
   useFrame(() => {
+    if (groupRef.current) {
+      const interactionPoint = groupRef.current.localToWorld(new THREE.Vector3(0, 0.72, 0.22))
+      const near = camera.position.distanceTo(interactionPoint) < CHAIR_INTERACTION_DISTANCE
+      const nextIsNearChair = near && interactionActive && !isDragging
+
+      if (nextIsNearChair !== isNearChairRef.current) {
+        isNearChairRef.current = nextIsNearChair
+        setIsNearChair(nextIsNearChair)
+      }
+    }
+
     if (isDragging) {
       raycaster.setFromCamera(mouse, camera)
       const intersection = new THREE.Vector3()
@@ -1474,7 +1804,7 @@ function OfficeChair() {
       const clampedX = Math.max(-2, Math.min(2, intersection.x))
       const clampedZ = Math.max(-1.5, Math.min(1.5, intersection.z))
       
-      setPosition([clampedX, 0, clampedZ])
+      onPositionChange([clampedX, 0, clampedZ])
     }
   })
   
@@ -1483,18 +1813,55 @@ function OfficeChair() {
     const handleMouseUp = () => {
       if (isDragging) {
         setIsDragging(false)
-        gl.domElement.style.cursor = 'auto'
+        gl.domElement.style.cursor = "auto"
       }
     }
     
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => window.removeEventListener('mouseup', handleMouseUp)
+    window.addEventListener("mouseup", handleMouseUp)
+    return () => window.removeEventListener("mouseup", handleMouseUp)
   }, [isDragging, gl])
+
+  useEffect(() => {
+    isWorkingModeRef.current = isWorkingMode
+  }, [isWorkingMode])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "KeyE" || event.repeat) return
+
+      if (isWorkingModeRef.current) {
+        setIsWorkingMode(false)
+        onWorkingMode?.(false)
+        camera.position.copy(originalCameraPos.current)
+        camera.quaternion.copy(originalCameraQuaternion.current)
+        return
+      }
+
+      if (!interactionActive || !isNearChairRef.current || !groupRef.current || isDragging) return
+
+      originalCameraPos.current.copy(camera.position)
+      originalCameraQuaternion.current.copy(camera.quaternion)
+
+      const workingCameraPosition = groupRef.current.localToWorld(new THREE.Vector3(0, 1, -0.02))
+      const workingLookTarget = groupRef.current.localToWorld(
+        new THREE.Vector3(0, Math.max(0.95, deskHeight + 0.18), 1.25),
+      )
+
+      setIsWorkingMode(true)
+      onWorkingMode?.(true)
+      camera.position.copy(workingCameraPosition)
+      camera.lookAt(workingLookTarget)
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [camera, deskHeight, interactionActive, isDragging, onWorkingMode])
   
   const handlePointerDown = (e: THREE.Event) => {
+    if (isWorkingMode) return
     e.stopPropagation()
     setIsDragging(true)
-    gl.domElement.style.cursor = 'grabbing'
+    gl.domElement.style.cursor = "grabbing"
   }
   
   return (
@@ -1503,8 +1870,18 @@ function OfficeChair() {
       position={position}
       rotation={[0, Math.PI, 0]}
       onPointerDown={handlePointerDown}
-      onPointerEnter={() => { setHovered(true); gl.domElement.style.cursor = 'grab' }}
-      onPointerLeave={() => { if (!isDragging) { setHovered(false); gl.domElement.style.cursor = 'auto' } }}
+      onPointerEnter={() => {
+        if (isWorkingMode) return
+        setHovered(true)
+        gl.domElement.style.cursor = "grab"
+      }}
+      onPointerLeave={() => {
+        if (isWorkingMode) return
+        if (!isDragging) {
+          setHovered(false)
+          gl.domElement.style.cursor = "auto"
+        }
+      }}
     >
       {/* Seat */}
       <RoundedBox args={[0.5, 0.08, 0.45]} position={[0, 0.5, 0]} radius={0.02} smoothness={4} castShadow>
@@ -1569,14 +1946,46 @@ function OfficeChair() {
       ))}
       
       {/* Drag hint */}
-      {hovered && !isDragging && (
+      {hovered && !isDragging && !isNearChair && !isWorkingMode && (
         <Html position={[0, 1.5, 0]} center>
           <div className="bg-black/70 text-white px-3 py-1.5 rounded text-xs whitespace-nowrap backdrop-blur-sm border border-white/20">
             Click and drag to move
           </div>
         </Html>
       )}
+
+      {isNearChair && !isDragging && !isWorkingMode && (
+        <Html position={[0, 1.7, 0.06]} center>
+          <div className="bg-gradient-to-r from-slate-900/90 to-zinc-900/90 text-white px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap backdrop-blur-md border border-white/20 shadow-lg">
+            Press [E] to sit and work
+          </div>
+        </Html>
+      )}
+
+      {isWorkingMode && <WorkingModeOverlay />}
     </group>
+  )
+}
+
+function WorkingModeOverlay() {
+  return (
+    <Html fullscreen>
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/12 via-transparent to-black/20" />
+
+        <div className="absolute top-8 left-1/2 -translate-x-1/2">
+          <div className="text-white/65 text-xs tracking-[0.35em] uppercase">
+            Working Mode
+          </div>
+        </div>
+
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
+          <div className="bg-black/60 text-white px-4 py-2 rounded-lg text-sm backdrop-blur-sm border border-white/10">
+            Press [E] to get up
+          </div>
+        </div>
+      </div>
+    </Html>
   )
 }
 

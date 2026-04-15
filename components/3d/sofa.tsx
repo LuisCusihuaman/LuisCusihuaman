@@ -10,7 +10,7 @@ interface SofaProps {
   onBurritoMode?: (active: boolean) => void
 }
 
-const SOFA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.52, 0, 0.95)
+export const SOFA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.52, 0, 0.95)
 const SOFA_INTERACTION_POINT = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.72, 0.5, 0.95)
 const BURRITO_CAMERA_POSITION = new THREE.Vector3(-ROOM_WIDTH / 2 + 0.74, 0.58, 0.98)
 const BURRITO_CAMERA_ROTATION = new THREE.Euler(-0.42, Math.PI / 2, -0.18, "YXZ")
@@ -23,20 +23,38 @@ export function Sofa({ onBurritoMode }: SofaProps) {
   const sofaRef = useRef<THREE.Group>(null)
   const originalCameraPos = useRef<THREE.Vector3>(new THREE.Vector3())
   const originalCameraQuaternion = useRef<THREE.Quaternion>(new THREE.Quaternion())
+  const isNearSofaRef = useRef(false)
+  const isLookingAtSofaRef = useRef(false)
+  const cameraForward = useRef(new THREE.Vector3())
+  const toSofa = useRef(new THREE.Vector3())
   
-  // Check if player is near the sofa (adjusted for smaller room)
+  // Only allow cozy mode when the sofa is both close and centered in the view.
   useFrame(() => {
     if (!sofaRef.current) return
+
     const dist = camera.position.distanceTo(SOFA_INTERACTION_POINT)
     const near = dist < 1.8
-    setIsNearSofa(near)
-    setShowPrompt(near && !isBurritoMode)
+    const looking =
+      near &&
+      camera
+        .getWorldDirection(cameraForward.current)
+        .dot(toSofa.current.copy(SOFA_INTERACTION_POINT).sub(camera.position).normalize()) > 0.72
+
+    if (near !== isNearSofaRef.current) {
+      isNearSofaRef.current = near
+      setIsNearSofa(near)
+    }
+
+    isLookingAtSofaRef.current = looking
+
+    const shouldShowPrompt = looking && !isBurritoMode
+    setShowPrompt((current) => (current === shouldShowPrompt ? current : shouldShowPrompt))
   })
   
   // Handle E key for burrito mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "KeyE") return
+      if (e.code !== "KeyE" || e.repeat) return
 
       if (isBurritoMode) {
         // Exit burrito mode from anywhere, even after looking around.
@@ -47,7 +65,7 @@ export function Sofa({ onBurritoMode }: SofaProps) {
         return
       }
 
-      if (isNearSofa) {
+      if (isNearSofaRef.current && isLookingAtSofaRef.current) {
         // Enter burrito mode
         originalCameraPos.current.copy(camera.position)
         originalCameraQuaternion.current.copy(camera.quaternion)
@@ -62,7 +80,7 @@ export function Sofa({ onBurritoMode }: SofaProps) {
     
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isNearSofa, isBurritoMode, camera, onBurritoMode])
+  }, [isBurritoMode, camera, onBurritoMode])
   
   return (
     <group ref={sofaRef} position={SOFA_POSITION} rotation={[0, Math.PI / 2, 0]}>

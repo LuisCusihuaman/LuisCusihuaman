@@ -5,6 +5,8 @@ import { useThree, useFrame } from "@react-three/fiber"
 import * as THREE from "three"
 import { ROOM_BACK_EXTENT, ROOM_FRONT_EXTENT, ROOM_WIDTH } from "./room"
 import { DESK_POSITION } from "./desk-setup"
+import { SOFA_POSITION } from "./sofa"
+import { TABLE_POSITION } from "./dining-area"
 
 interface FirstPersonControlsProps {
   allowMovement?: boolean
@@ -24,6 +26,78 @@ const DEFAULT_ROOM_BOUNDS = {
   maxX: ROOM_WIDTH / 2 - 0.25,
   minZ: -ROOM_BACK_EXTENT + 0.25,
   maxZ: ROOM_FRONT_EXTENT - 0.25,
+}
+
+const PLAYER_COLLISION_RADIUS = 0.24
+
+type Obstacle = {
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
+}
+
+const MOVEMENT_OBSTACLES: Obstacle[] = [
+  {
+    minX: DESK_POSITION[0] - 1.2 - PLAYER_COLLISION_RADIUS,
+    maxX: DESK_POSITION[0] + 1.2 + PLAYER_COLLISION_RADIUS,
+    minZ: DESK_POSITION[2] - 0.38 - PLAYER_COLLISION_RADIUS,
+    maxZ: DESK_POSITION[2] + 0.38 + PLAYER_COLLISION_RADIUS,
+  },
+  {
+    minX: SOFA_POSITION.x - 0.52 - PLAYER_COLLISION_RADIUS,
+    maxX: SOFA_POSITION.x + 0.52 + PLAYER_COLLISION_RADIUS,
+    minZ: SOFA_POSITION.z - 0.94 - PLAYER_COLLISION_RADIUS,
+    maxZ: SOFA_POSITION.z + 0.94 + PLAYER_COLLISION_RADIUS,
+  },
+  {
+    minX: TABLE_POSITION[0] - 0.4 - PLAYER_COLLISION_RADIUS,
+    maxX: TABLE_POSITION[0] + 0.4 + PLAYER_COLLISION_RADIUS,
+    minZ: TABLE_POSITION[2] - 0.96 - PLAYER_COLLISION_RADIUS,
+    maxZ: TABLE_POSITION[2] + 0.96 + PLAYER_COLLISION_RADIUS,
+  },
+]
+
+function isInsideObstacle(x: number, z: number, obstacle: Obstacle) {
+  return x > obstacle.minX && x < obstacle.maxX && z > obstacle.minZ && z < obstacle.maxZ
+}
+
+function isBlockedByObstacle(x: number, z: number) {
+  return MOVEMENT_OBSTACLES.some((obstacle) => isInsideObstacle(x, z, obstacle))
+}
+
+function resolveObstacleOverlap(x: number, z: number) {
+  const resolved = { x, z }
+
+  for (let i = 0; i < MOVEMENT_OBSTACLES.length; i += 1) {
+    let changed = false
+
+    for (const obstacle of MOVEMENT_OBSTACLES) {
+      if (!isInsideObstacle(resolved.x, resolved.z, obstacle)) continue
+
+      const pushes = [
+        { axis: "x" as const, delta: obstacle.minX - resolved.x },
+        { axis: "x" as const, delta: obstacle.maxX - resolved.x },
+        { axis: "z" as const, delta: obstacle.minZ - resolved.z },
+        { axis: "z" as const, delta: obstacle.maxZ - resolved.z },
+      ]
+      const nearestExit = pushes.reduce((best, candidate) =>
+        Math.abs(candidate.delta) < Math.abs(best.delta) ? candidate : best,
+      )
+
+      if (nearestExit.axis === "x") {
+        resolved.x += nearestExit.delta
+      } else {
+        resolved.z += nearestExit.delta
+      }
+
+      changed = true
+    }
+
+    if (!changed) break
+  }
+
+  return resolved
 }
 
 export function FirstPersonControls({
@@ -192,6 +266,10 @@ export function FirstPersonControls({
       return
     }
 
+    const unstuckPosition = resolveObstacleOverlap(camera.position.x, camera.position.z)
+    camera.position.x = Math.max(roomBounds.minX, Math.min(roomBounds.maxX, unstuckPosition.x))
+    camera.position.z = Math.max(roomBounds.minZ, Math.min(roomBounds.maxZ, unstuckPosition.z))
+
     // Calculate movement direction
     const direction = new THREE.Vector3()
     const frontVector = new THREE.Vector3(0, 0, Number(moveState.current.backward) - Number(moveState.current.forward))
@@ -225,8 +303,15 @@ export function FirstPersonControls({
     }
 
     // Room bounds collision
-    camera.position.x = Math.max(roomBounds.minX, Math.min(roomBounds.maxX, newX))
-    camera.position.z = Math.max(roomBounds.minZ, Math.min(roomBounds.maxZ, newZ))
+    const clampedX = Math.max(roomBounds.minX, Math.min(roomBounds.maxX, newX))
+    const clampedZ = Math.max(roomBounds.minZ, Math.min(roomBounds.maxZ, newZ))
+
+    const nextX = isBlockedByObstacle(clampedX, camera.position.z) ? camera.position.x : clampedX
+    const nextZ = isBlockedByObstacle(nextX, clampedZ) ? camera.position.z : clampedZ
+    const resolvedPosition = resolveObstacleOverlap(nextX, nextZ)
+
+    camera.position.x = Math.max(roomBounds.minX, Math.min(roomBounds.maxX, resolvedPosition.x))
+    camera.position.z = Math.max(roomBounds.minZ, Math.min(roomBounds.maxZ, resolvedPosition.z))
     camera.position.y = newY
   })
 

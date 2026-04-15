@@ -19,21 +19,25 @@ function Scene({
   onClick,
   onBurritoMode,
   isBurritoMode,
+  onWorkingMode,
+  isWorkingMode,
 }: { 
   onHover: (obj: string | null) => void
   onClick: (obj: string) => void
   onBurritoMode: (active: boolean) => void
   isBurritoMode: boolean
+  onWorkingMode: (active: boolean) => void
+  isWorkingMode: boolean
 }) {
   return (
     <>
       <Lighting />
       <Room />
-      <DeskSetup onObjectHover={onHover} onObjectClick={onClick} />
+      <DeskSetup onObjectHover={onHover} onObjectClick={onClick} onWorkingMode={onWorkingMode} />
       <Sofa onBurritoMode={onBurritoMode} />
-      <DiningArea />
+      <DiningArea onDiningMode={onWorkingMode} />
       <WallArt />
-      <FirstPersonControls allowMovement={!isBurritoMode} />
+      <FirstPersonControls allowMovement={!isBurritoMode && !isWorkingMode} />
     </>
   )
 }
@@ -59,6 +63,8 @@ export function PortfolioScene() {
   const [hoveredObject, setHoveredObject] = useState<string | null>(null)
   const [activePanel, setActivePanel] = useState<string | null>(null)
   const [isBurritoMode, setIsBurritoMode] = useState(false)
+  const [isWorkingMode, setIsWorkingMode] = useState(false)
+  const isImmersiveMode = isBurritoMode || isWorkingMode
   
   const handleObjectClick = useCallback((object: string) => {
     // Exit pointer lock when opening panel
@@ -105,6 +111,8 @@ export function PortfolioScene() {
             onClick={handleObjectClick}
             onBurritoMode={setIsBurritoMode}
             isBurritoMode={isBurritoMode}
+            onWorkingMode={setIsWorkingMode}
+            isWorkingMode={isWorkingMode}
           />
           <PointerLockTracker setIsLocked={setIsLocked} />
           <Preload all />
@@ -112,13 +120,13 @@ export function PortfolioScene() {
       </Canvas>
       
       {/* UI Overlays - hidden in burrito mode */}
-      {!isBurritoMode && <ControlsHint isLocked={isLocked} />}
-      {!isBurritoMode && <Crosshair isLocked={isLocked} />}
-      {!isBurritoMode && <HoverIndicator hoveredObject={hoveredObject} />}
-      {!isBurritoMode && <PortfolioPanel activePanel={activePanel} onClose={handleClosePanel} />}
+      {!isImmersiveMode && <ControlsHint isLocked={isLocked} />}
+      {!isImmersiveMode && <Crosshair isLocked={isLocked} />}
+      {!isImmersiveMode && <HoverIndicator hoveredObject={hoveredObject} />}
+      {!isImmersiveMode && <PortfolioPanel activePanel={activePanel} onClose={handleClosePanel} />}
       
       {/* Navigation hint */}
-      {isLocked && !activePanel && !isBurritoMode && (
+      {isLocked && !activePanel && !isImmersiveMode && (
         <div className="fixed bottom-4 right-4 z-20">
           <div className="px-3 py-1.5 bg-neutral-900/80 backdrop-blur-sm rounded-lg border border-neutral-800">
             <p className="text-xs text-neutral-400">
